@@ -1,4 +1,3 @@
 flask
 requests
 gunicorn
-m3u8
