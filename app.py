@@ -1,89 +1,97 @@
 import requests
 import re
 import os
-from flask import Flask, Response, request, render_template_string
+from flask import Flask, Response, request, jsonify
 
 app = Flask(__name__)
 
-# Configurações de Navegação
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+# Configurações de Identidade
+UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
 
-def extrair_link_m3u8(url_player, referer_site):
-    """ Entra no player e captura o sinal real .m3u8 """
+def resolver_sinal(url, referer):
+    """ Tenta extrair o link real .m3u8 simulando um navegador """
+    session = requests.Session()
+    headers = {
+        "User-Agent": UA,
+        "Referer": referer,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,webp,*/*;q=0.8"
+    }
+    
     try:
-        headers = {"User-Agent": UA, "Referer": referer_site}
-        # 1. Pega o HTML do player
-        res = requests.get(url_player, headers=headers, timeout=10)
-        html = res.text
-        
-        # 2. Busca link .m3u8 (HLS) no código
+        # 1. Acessa a página do player
+        response = session.get(url, headers=headers, timeout=10)
+        html = response.text
+
+        # 2. Procura por links .m3u8 no código (comum em players Clappr ou VideoJS)
+        # Procura em aspas simples ou duplas, tratando barras invertidas
         match = re.search(r'["\'](https?://[^\s"\']+?\.m3u8[^\s"\']*)["\']', html)
         if match:
-            return match.group(1).replace("\\/", "/")
-        
-        # 3. Busca em iframes se não achar na principal
-        iframe = re.search(r'iframe.*?src=["\'](https?://.*?)["\']', html)
-        if iframe:
-            return extrair_link_m3u8(iframe.group(1), url_player)
-    except:
-        pass
+            stream_url = match.group(1).replace("\\/", "/")
+            # Retorna o link com o sufixo de headers para o player IPTV
+            return f"{stream_url}|User-Agent={UA}&Referer={url}"
+
+        # 3. Se não achar, tenta buscar dentro de IFRAMES
+        iframes = re.findall(r'<iframe.*?src=["\'](https?://.*?)["\']', html)
+        for ifr_url in iframes:
+            if "google" not in ifr_url and "ads" not in ifr_url:
+                # Busca recursiva no iframe
+                return resolver_sinal(ifr_url, url)
+
+    except Exception as e:
+        print(f"Erro ao resolver {url}: {e}")
+    
     return None
 
 @app.route('/')
 def home():
-    return f"<h1>Servidor S1 & S2 Ativo</h1><p>Link M3U: {request.host_url}playlist.m3u</p>"
+    return f"<h1>Servidor Ativo</h1><p>Playlist: {request.host_url}playlist.m3u</p>"
 
 @app.route('/playlist.m3u')
 def playlist():
-    """ Gera a playlist M3U apontando para o nosso resolvedor """
+    """ Gera a playlist M3U unificada """
     channels = ["#EXTM3U"]
     base_url = request.host_url.rstrip('/')
 
     # --- S1 (Sinal Público) ---
     try:
-        r = requests.get("https://apisinalpublico.vercel.app/canais.json", timeout=10)
-        for c in r.json():
+        r1 = requests.get("https://apisinalpublico.vercel.app/canais.json", timeout=10)
+        for c in r1.json():
             name, logo, target = c.get('name'), c.get('image'), c.get('url')
-            # Mudamos o link para passar pelo nosso servidor
-            link = f"{base_url}/get_stream?s=S1&id={target}"
+            link = f"{base_url}/play?s=S1&id={target}"
             channels.append(f'#EXTINF:-1 tvg-logo="{logo}" group-title="S1", [S1] {name}\n{link}')
     except: pass
 
     # --- S2 (Minha Tela) ---
     try:
-        h = {"Referer": "https://minhatela.xyz/", "User-Agent": UA}
-        r = requests.get("https://myapiplay.top/api/guiadejogos/epg.php", headers=h, timeout=10)
-        for c in r.json():
+        h2 = {"Referer": "https://minhatela.xyz/", "User-Agent": UA}
+        r2 = requests.get("https://myapiplay.top/api/guiadejogos/epg.php", headers=h2, timeout=10)
+        for c in r2.json():
             if c.get('channelLogo'):
                 name, logo = c.get('name'), c.get('logo')
+                # Gera link direto do player deles
                 target = f"https://meuplayeronlinehd.com/myplay/watch.html?id={c.get('channelLogo')}"
-                link = f"{base_url}/get_stream?s=S2&id={target}"
+                link = f"{base_url}/play?s=S2&id={target}"
                 channels.append(f'#EXTINF:-1 tvg-logo="{logo}" group-title="S2", [S2] {name}\n{link}')
     except: pass
 
     return Response("\n".join(channels), mimetype='text/plain')
 
-@app.route('/get_stream')
-def get_stream():
-    """ 
-    Esta rota converte a página do site em um link de vídeo que o IPTV entende.
-    Usamos o sufixo |Referer= para que players modernos como Smarters/OTT aceitem.
-    """
+@app.route('/play')
+def play():
+    """ Roda o resolvedor e redireciona para o sinal real """
     source = request.args.get('s')
     target = request.args.get('id')
     
     ref = "https://sinalpublic.vercel.app/" if source == "S1" else "https://minhatela.xyz/"
     
-    # 1. Tenta achar o .m3u8 real
-    real_video_url = extrair_link_m3u8(target, ref)
+    real_link = resolver_sinal(target, ref)
     
-    if real_video_url:
-        # 2. Adiciona os headers necessários no final da URL (padrão IPTV)
-        # Isso faz o player enviar o Referer correto para o servidor do vídeo
-        final_url = f"{real_video_url}|Referer={ref}&User-Agent={UA}"
-        return Response("", status=302, headers={"Location": final_url})
+    if real_link:
+        # Redireciona o player de IPTV para o fluxo direto
+        return Response("", status=302, headers={"Location": real_link})
     
-    return "Stream não encontrada", 404
+    # Se tudo falhar, tenta o link original
+    return Response("", status=302, headers={"Location": target})
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
