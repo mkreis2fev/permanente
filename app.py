@@ -1,101 +1,99 @@
 import requests
 import re
 import os
-from flask import Flask, Response, request, jsonify
+from flask import Flask, Response, request, render_template_string
 
 app = Flask(__name__)
 
-# Headers para fingir ser um navegador real
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept": "*/*",
-}
+# Configurações de Identificação
+UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-def extrair_sinal_real(url, referer):
-    """ Tenta encontrar o link .m3u8 escondido no código do site """
+def resolver_m3u8(url, referer):
+    """ Entra na página do player e extrai o link .m3u8 real """
     try:
-        h = HEADERS.copy()
-        h["Referer"] = referer
+        headers = {"User-Agent": UA, "Referer": referer}
+        response = requests.get(url, headers=headers, timeout=10)
+        html = response.text
         
-        # 1. Acessa a página do player
-        resp = requests.get(url, headers=h, timeout=10)
-        html = resp.text
-
-        # 2. Busca padrão de link .m3u8 (HLS) no JavaScript ou HTML
-        # Procura por: "https://...m3u8" ou 'https://...m3u8'
-        links = re.findall(r'["\'](https?://[^\s"\']+?\.m3u8[^\s"\']*)["\']', html)
+        # Procura por links .m3u8 (HLS) no código-fonte
+        # Tenta encontrar em variáveis JS ou links diretos
+        found_links = re.findall(r'["\'](https?://[^\s"\']+?\.m3u8[^\s"\']*)["\']', html)
         
-        if links:
-            # Pega o primeiro link encontrado e limpa escapes de barra
-            return links[0].replace("\\/", "/")
-
-        # 3. Se não achar, tenta buscar dentro de um IFRAME
-        iframe = re.search(r'iframe.*?src=["\'](.*?)["\']', html)
+        if found_links:
+            link = found_links[0].replace("\\/", "/")
+            # Alguns players precisam do Referer grudado no link para o App IPTV aceitar
+            return f"{link}|Referer={referer}&User-Agent={UA}"
+            
+        # Busca em iframes caso não ache na principal
+        iframe = re.search(r'iframe.*?src=["\'](https?://.*?)["\']', html)
         if iframe:
             iframe_url = iframe.group(1)
-            if iframe_url.startswith("//"): iframe_url = "https:" + iframe_url
-            if "google" not in iframe_url: # Evita anúncios
-                return extrair_sinal_real(iframe_url, url)
-
-    except Exception as e:
-        print(f"Erro ao extrair de {url}: {e}")
+            if "google" not in iframe_url:
+                return resolver_m3u8(iframe_url, url)
+    except:
+        pass
     return None
 
 @app.route('/')
-def index():
-    return "<h1>Servidor IPTV S1 & S2 Ativo</h1><p>Playlist: /playlist.m3u</p>"
+def home():
+    host = request.host_url
+    return render_template_string("""
+        <body style="font-family:sans-serif; background:#0f172a; color:white; text-align:center; padding:50px;">
+            <h1 style="color:#3b82f6;">Agregador IPTV S1 & S2</h1>
+            <div style="background:#1e293b; padding:20px; border-radius:10px; border:1px solid #334155; display:inline-block;">
+                <p>Cole este link no seu aplicativo de IPTV:</p>
+                <code style="color:#10b981; font-size:1.2em;">{{ host }}playlist.m3u</code>
+            </div>
+            <p style="margin-top:20px; color:#64748b;">S1: Sinal Público | S2: Minha Tela</p>
+        </body>
+    """, host=host)
 
 @app.route('/playlist.m3u')
 def playlist():
-    """ Gera a playlist com o resolvedor de links integrado """
-    lines = ["#EXTM3U"]
+    channels = []
     base_url = request.host_url.rstrip('/')
 
-    # --- CANAIS S1 (Sinal Público) ---
+    # --- EXTRAÇÃO S1 (Sinal Público) ---
     try:
         r1 = requests.get("https://apisinalpublico.vercel.app/canais.json", timeout=10)
         for c in r1.json():
-            name = c.get("name")
-            target = c.get("url")
-            logo = c.get("image")
-            # Link que passa pelo nosso script para ser 'desbloqueado'
-            link = f"{base_url}/stream?url={target}&ref=https://sinalpublic.vercel.app/"
-            lines.append(f'#EXTINF:-1 tvg-logo="{logo}" group-title="S1", [S1] {name}\n{link}')
+            name = c.get('name')
+            logo = c.get('image')
+            target = c.get('url')
+            # Rota de redirecionamento para o nosso servidor resolver o link
+            link = f"{base_url}/play?s=S1&id={target}"
+            channels.append(f'#EXTINF:-1 tvg-logo="{logo}" group-title="S1", [S1] {name}\n{link}')
     except: pass
 
-    # --- CANAIS S2 (Minha Tela) ---
+    # --- EXTRAÇÃO S2 (Minha Tela) ---
     try:
-        r2 = requests.get("https://myapiplay.top/api/guiadejogos/epg.php", 
-                          headers={"Referer": "https://minhatela.xyz/"}, timeout=10)
+        h2 = {"Referer": "https://minhatela.xyz/", "User-Agent": UA}
+        r2 = requests.get("https://myapiplay.top/api/guiadejogos/epg.php", headers=h2, timeout=10)
         for c in r2.json():
-            if c.get("channelLogo"):
-                name = c.get("name")
-                logo = c.get("logo")
+            if c.get('channelLogo'):
+                name = c.get('name')
+                logo = c.get('logo')
                 target = f"https://meuplayeronlinehd.com/myplay/watch.html?id={c.get('channelLogo')}"
-                link = f"{base_url}/stream?url={target}&ref=https://minhatela.xyz/"
-                lines.append(f'#EXTINF:-1 tvg-logo="{logo}" group-title="S2", [S2] {name}\n{link}')
+                link = f"{base_url}/play?s=S2&id={target}"
+                channels.append(f'#EXTINF:-1 tvg-logo="{logo}" group-title="S2", [S2] {name}\n{link}')
     except: pass
 
-    return Response("\n".join(lines), mimetype='text/plain')
+    m3u = "#EXTM3U\n" + "\n".join(channels)
+    return Response(m3u, mimetype='text/plain')
 
-@app.route('/stream')
-def stream():
-    """ Resolve o link em tempo real e redireciona o player """
-    target_url = request.args.get('url')
-    referer = request.args.get('ref')
+@app.route('/play')
+def play():
+    """ Rota que resolve o link e redireciona o fluxo """
+    source = request.args.get('s')
+    target = request.args.get('id')
+    referer = "https://sinalpublic.vercel.app/" if source == "S1" else "https://minhatela.xyz/"
     
-    if not target_url:
-        return "URL faltando", 400
-
-    # Tenta descobrir o .m3u8 real
-    real_m3u8 = extrair_sinal_real(target_url, referer)
+    real_link = resolver_m3u8(target, referer)
     
-    if real_m3u8:
-        # Se achou o link direto, redireciona o player IPTV para ele
-        return Response("", status=302, headers={"Location": real_m3u8})
-    else:
-        # Se falhou, manda para o link original (provavelmente não vai abrir no IPTV comum)
-        return Response("", status=302, headers={"Location": target_url})
+    if real_link:
+        # Redireciona o aplicativo para o sinal direto decodificado
+        return Response("", status=302, headers={"Location": real_link})
+    return "Não foi possível carregar o sinal.", 404
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
