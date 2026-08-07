@@ -1,113 +1,116 @@
 import requests
 import re
 import os
-import base64
-from flask import Flask, Response, request, render_template_string
-from urllib.parse import urljoin
+from flask import Flask, Response, request, redirect, render_template_string
 
 app = Flask(__name__)
 
-# Configurações de Agente
+# Configurações de Navegação (Fingindo ser um navegador real)
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
 
-def get_headers(source):
-    if source == 's1':
-        return {
-            "User-Agent": UA,
-            "Referer": "https://sinaldvd.github.io/",
-            "Origin": "https://sinaldvd.github.io",
-            "Sec-Fetch-Mode": "cors",
-            "Sec-Fetch-Site": "cross-site"
-        }
-    else:
-        return {
-            "User-Agent": UA,
-            "Referer": "https://minhatela.xyz/",
-            "Origin": "https://minhatela.xyz"
-        }
+def resolver_s1(cid):
+    """ Varre o Sinal Público para extrair o sinal de vídeo atual """
+    try:
+        # Acessa a página do player intermediário
+        url_player = f"https://sinalpublicoetv.vercel.app/?id={cid}"
+        headers = {"User-Agent": UA, "Referer": "https://sinalpublic.vercel.app/"}
+        res = requests.get(url_player, headers=headers, timeout=5)
+        
+        # Procura o link do player final no github.io dentro do código
+        iframe_match = re.search(r'src=["\'](https?://sinaldvd\.github\.io/tv/player\.html\?id=.*?)["\']', res.text)
+        if iframe_match:
+            iframe_url = iframe_match.group(1)
+            # Acessa o player final para capturar o link .m3u8
+            res2 = requests.get(iframe_url, headers={"User-Agent": UA, "Referer": url_player}, timeout=5)
+            m3u8_match = re.search(r'["\'](https?://.*?\.m3u8.*?)["\']', res2.text)
+            if m3u8_match:
+                return m3u8_match.group(1).replace("\\/", "/")
+    except Exception as e:
+        print(f"Erro ao resolver S1 ({cid}): {e}")
+    
+    # Fallback para o domínio de nuvem comum do S1
+    return f"https://t5r4e3w2q1y0-cloudflare-net.vercel.app/{cid}.m3u8"
+
+def resolver_s2(cid):
+    """ Varre o Minha Tela para extrair o sinal de vídeo atual """
+    try:
+        # Minha Tela geralmente usa este player base
+        url_player = f"https://meuplayeronlinehd.com/myplay/watch.html?id={cid}"
+        headers = {"User-Agent": UA, "Referer": "https://minhatela.xyz/"}
+        res = requests.get(url_player, headers=headers, timeout=5)
+        
+        # Tenta capturar o link do stream .m3u8 direto do código fonte do player
+        m3u8_match = re.search(r'["\'](https?://.*?\.m3u8.*?)["\']', res.text)
+        if m3u8_match:
+            return m3u8_match.group(1).replace("\\/", "/")
+    except Exception as e:
+        print(f"Erro ao resolver S2 ({cid}): {e}")
+    return None
 
 @app.route('/')
-def home():
-    return f"Servidor IPTV Ativo: {request.host_url}playlist.m3u"
+def index():
+    host = request.host_url
+    return render_template_string("""
+        <body style="font-family:sans-serif; background:#0f172a; color:white; text-align:center; padding:50px;">
+            <h1 style="color:#3b82f6;">🚀 IPTV Proxy Server - S1 & S2</h1>
+            <p>Servidor de captura dinâmica para Railway</p>
+            <div style="background:#1e293b; padding:20px; border-radius:10px; border:1px solid #334155; display:inline-block; margin:20px;">
+                <p>Playlist M3U:</p>
+                <code style="color:#10b981; font-size:1.1em;">{{ host }}playlist.m3u</code>
+            </div>
+            <p style="color:#64748b; font-size:0.9em;">Recomendado: OTT Navigator, Televizo ou VLC.</p>
+        </body>
+    """, host=host)
 
 @app.route('/playlist.m3u')
 def playlist():
     host = request.host_url.rstrip('/')
-    lines = ["#EXTM3U"]
+    m3u = ["#EXTM3U"]
     
-    # S1 - Sinal Público
+    # --- Fonte S1: Sinal Público ---
     try:
-        r = requests.get("https://apisinalpublico.vercel.app/canais.json", timeout=10).json()
-        for c in r:
-            cid = c.get('url').split('=')[-1]
-            # O link agora aponta para o nosso proxy com .m3u8 no final para compatibilidade
-            link = f"{host}/proxy/s1/{cid}/stream.m3u8"
-            lines.append(f'#EXTINF:-1 tvg-logo="{c.get("image")}" group-title="S1", [S1] {c.get("name")}\n{link}')
+        r1 = requests.get("https://apisinalpublico.vercel.app/canais.json", timeout=10).json()
+        for c in r1:
+            cid = c.get('url', '').split('=')[-1]
+            if cid:
+                m3u.append(f'#EXTINF:-1 tvg-logo="{c.get("image")}" group-title="S1 (Sinal Publico)", [S1] {c.get("name")}')
+                m3u.append(f'{host}/play/s1/{cid}')
     except: pass
 
-    # S2 - Minha Tela
+    # --- Fonte S2: Minha Tela ---
     try:
-        headers = {"Referer": "https://minhatela.xyz/", "User-Agent": UA}
-        r = requests.get("https://myapiplay.top/api/guiadejogos/epg.php", headers=headers, timeout=10).json()
-        for c in r:
-            if c.get('channelLogo'):
-                cid = c.get('channelLogo')
-                link = f"{host}/proxy/s2/{cid}/stream.m3u8"
-                lines.append(f'#EXTINF:-1 tvg-logo="{c.get("logo")}" group-title="S2", [S2] {c.get("name")}\n{link}')
+        h2 = {"Referer": "https://minhatela.xyz/", "User-Agent": UA}
+        r2 = requests.get("https://myapiplay.top/api/guiadejogos/epg.php", headers=h2, timeout=10).json()
+        for c in r2:
+            cid = c.get('channelLogo')
+            if cid:
+                m3u.append(f'#EXTINF:-1 tvg-logo="{c.get("logo")}" group-title="S2 (Minha Tela)", [S2] {c.get("name")}')
+                m3u.append(f'{host}/play/s2/{cid}')
     except: pass
 
-    return Response("\n".join(lines), mimetype='text/plain')
+    return Response("\n".join(m3u), mimetype='text/plain')
 
-@app.route('/proxy/<source>/<cid>/stream.m3u8')
-def proxy_m3u8(source, cid):
-    """ Baixa o m3u8 original e reescreve os links para passarem pelo nosso servidor """
+@app.route('/play/<source>/<cid>')
+def play(source, cid):
+    """ Rota que resolve o link final e redireciona o reprodutor """
+    stream_url = None
+    referer = ""
+
     if source == 's1':
-        # S1 costuma usar esse formato
-        target = f"https://t5r4e3w2q1y0-cloudflare-net.vercel.app/{cid}.m3u8"
-    else:
-        # Padrão S2 simplificado
-        target = f"https://meuplayeronlinehd.com/hls/{cid}.m3u8"
+        stream_url = resolver_s1(cid)
+        referer = "https://sinaldvd.github.io/"
+    elif source == 's2':
+        stream_url = resolver_s2(cid)
+        referer = f"https://meuplayeronlinehd.com/myplay/watch.html?id={cid}"
 
-    try:
-        headers = get_headers(source)
-        res = requests.get(target, headers=headers, timeout=10)
-        
-        if res.status_code != 200:
-            # Segunda tentativa para S1 com domínio alternativo
-            if source == 's1':
-                target = f"https://a9b8c7d6e5f4-cloudflare-net.vercel.app/{cid}.m3u8"
-                res = requests.get(target, headers=headers, timeout=10)
-
-        # Reescreve o conteúdo do M3U8
-        lines = res.text.splitlines()
-        new_lines = []
-        base_url = res.url.rsplit('/', 1)[0] + '/'
-        
-        for line in lines:
-            if line.startswith('#') or not line.strip():
-                new_lines.append(line)
-            else:
-                # Transforma cada segmento .ts ou sub-playlist em um link do nosso proxy
-                full_url = urljoin(base_url, line.strip())
-                encoded_url = base64.urlsafe_b64encode(full_url.encode()).decode()
-                new_lines.append(f"{request.host_url.rstrip('/')}/ts?u={encoded_url}&s={source}")
-        
-        return Response("\n".join(new_lines), mimetype='application/vnd.apple.mpegurl')
-    except:
-        return "Erro ao processar sinal", 404
-
-@app.route('/ts')
-def proxy_ts():
-    """ O túnel real para os dados do vídeo """
-    url = base64.urlsafe_b64decode(request.args.get('u')).decode()
-    source = request.args.get('s')
+    if stream_url:
+        # Formato que players de IPTV entendem para passar o Referer corretamente
+        final_url = f"{stream_url}|Referer={referer}&User-Agent={UA}"
+        return redirect(final_url)
     
-    try:
-        res = requests.get(url, headers=get_headers(source), stream=True, timeout=15)
-        return Response(res.iter_content(chunk_size=1024*64), content_type=res.headers.get('Content-Type'))
-    except:
-        return "", 404
+    return "Não foi possível capturar o sinal do canal.", 404
 
 if __name__ == '__main__':
+    # Configuração para rodar no Railway
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
