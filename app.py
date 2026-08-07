@@ -1,96 +1,98 @@
 import requests
-from flask import Flask, jsonify, render_template_string, Response
+from flask import Flask, jsonify, Response, render_template_string
 import os
 
 app = Flask(__name__)
 
-# Configurações das fontes
+# Configurações das fontes de dados
 SOURCES = {
-    "minhatela": {
+    "s1_sinalpublic": {
+        "url": "https://apisinalpublico.vercel.app/canais.json",
+        "referer": "https://sinalpublic.vercel.app/",
+        "label": "S1"
+    },
+    "s2_minhatela": {
         "url": "https://myapiplay.top/api/guiadejogos/epg.php",
         "referer": "https://minhatela.xyz/",
-        "player_base": "https://meuplayeronlinehd.com/myplay/watch.html?id="
-    },
-    "sinalpublic": {
-        "url": "https://apisinalpublico.vercel.app/canais.json",
-        "referer": "https://sinalpublic.vercel.app/"
+        "player_base": "https://meuplayeronlinehd.com/myplay/watch.html?id=",
+        "label": "S2"
     }
 }
 
-def fetch_all_channels():
+def fetch_channels():
     all_channels = []
-    
-    # Extração Minha Tela (Identificado como S2)
-    try:
-        headers_s2 = {
-            "Referer": SOURCES["minhatela"]["referer"],
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        }
-        r1 = requests.get(SOURCES["minhatela"]["url"], headers=headers_s2, timeout=10)
-        if r1.status_code == 200:
-            for item in r1.json():
-                if item.get("channelLogo"):
-                    all_channels.append({
-                        "name": item.get("name"),
-                        "url": f"{SOURCES['minhatela']['player_base']}{item.get('channelLogo')}",
-                        "logo": item.get("logo"),
-                        "group": "S2"  # <--- Identificação solicitada
-                    })
-    except Exception as e:
-        print(f"Erro S2 (Minha Tela): {e}")
+    headers_base = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
 
-    # Extração Sinal Público
+    # 1. Extração S1 (Sinal Público)
     try:
-        headers_sp = {
-            "Referer": SOURCES["sinalpublic"]["referer"],
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        }
-        r2 = requests.get(SOURCES["sinalpublic"]["url"], headers=headers_sp, timeout=10)
-        if r2.status_code == 200:
-            for item in r2.json():
+        s1_cfg = SOURCES["s1_sinalpublic"]
+        headers = headers_base.copy()
+        headers["Referer"] = s1_cfg["referer"]
+        
+        response = requests.get(s1_cfg["url"], headers=headers, timeout=10)
+        if response.status_code == 200:
+            for item in response.json():
                 all_channels.append({
-                    "name": item.get("name"),
+                    "name": f"[{s1_cfg['label']}] {item.get('name')}",
                     "url": item.get("url"),
                     "logo": item.get("image"),
-                    "group": "Sinal Público"
+                    "group": s1_cfg["label"]
                 })
     except Exception as e:
-        print(f"Erro Sinal Público: {e}")
-    
+        print(f"Erro ao buscar S1: {e}")
+
+    # 2. Extração S2 (Minha Tela)
+    try:
+        s2_cfg = SOURCES["s2_minhatela"]
+        headers = headers_base.copy()
+        headers["Referer"] = s2_cfg["referer"]
+        
+        response = requests.get(s2_cfg["url"], headers=headers, timeout=10)
+        if response.status_code == 200:
+            for item in response.json():
+                if item.get("channelLogo"):
+                    all_channels.append({
+                        "name": f"[{s2_cfg['label']}] {item.get('name')}",
+                        "url": f"{s2_cfg['player_base']}{item.get('channelLogo')}",
+                        "logo": item.get("logo"),
+                        "group": s2_cfg["label"]
+                    })
+    except Exception as e:
+        print(f"Erro ao buscar S2: {e}")
+
     return all_channels
 
 @app.route('/')
-def index():
-    return """
-    <html>
-        <body style="font-family: sans-serif; text-align: center; padding-top: 50px; background: #121212; color: white;">
-            <h1>🚀 Servidor IPTV Ativo</h1>
-            <p>Sua lista de canais está pronta!</p>
-            <div style="background: #1e1e1e; padding: 20px; display: inline-block; border-radius: 10px; border: 1px solid #007bff;">
-                Link para o seu App IPTV:<br>
-                <code style="color: #007bff; font-size: 1.2em;">/playlist.m3u</code>
-            </div>
-            <p><a href="/api/channels" style="color: gray;">Ver API JSON</a></p>
-        </body>
-    </html>
-    """
-
-@app.route('/api/channels')
-def get_channels():
-    return jsonify(fetch_all_channels())
+def home():
+    return render_template_string("""
+        <html>
+            <head><title>IPTV Agregador S1 & S2</title></head>
+            <body style="font-family:sans-serif; background:#121212; color:white; text-align:center; padding:50px;">
+                <h1 style="color:#007bff;">📡 Servidor IPTV Online</h1>
+                <p>Canais S1 (Sinal Público) e S2 (Minha Tela) unificados.</p>
+                <div style="margin:20px; padding:20px; border:1px solid #333; display:inline-block; border-radius:10px;">
+                    Link da Playlist M3U:<br>
+                    <input type="text" value="{{ url }}/playlist.m3u" style="width:400px; padding:10px; margin-top:10px; background:#000; color:#0f0; border:1px solid #555;" readonly>
+                </div>
+                <p><small>Copie o link acima e cole no seu reprodutor IPTV (VLC, Smarters, etc)</small></p>
+            </body>
+        </html>
+    """, url=os.environ.get('RAILWAY_STATIC_URL', 'http://localhost:5000'))
 
 @app.route('/playlist.m3u')
-def generate_m3u():
-    """Gera a lista M3U para o reprodutor IPTV"""
-    channels = fetch_all_channels()
-    m3u_content = "#EXTM3U\n"
-    
+def playlist():
+    channels = fetch_channels()
+    m3u = "#EXTM3U\n"
     for c in channels:
-        # Formatação padrão IPTV com logo, grupo e nome
-        m3u_content += f'#EXTINF:-1 tvg-logo="{c["logo"]}" group-title="{c["group"]}",{c["name"]}\n'
-        m3u_content += f'{c["url"]}\n'
-    
-    return Response(m3u_content, mimetype='text/plain')
+        m3u += f'#EXTINF:-1 tvg-logo="{c["logo"]}" group-title="{c["group"]}",{c["name"]}\n'
+        m3u += f'{c["url"]}\n'
+    return Response(m3u, mimetype='text/plain')
+
+@app.route('/api/json')
+def api():
+    return jsonify(fetch_channels())
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
