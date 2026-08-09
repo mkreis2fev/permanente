@@ -3,32 +3,30 @@ import json
 import logging
 import random
 
-# Configura logs detalhados
+# Força logs detalhados no console do Railway
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def decode_url(obfuscated_url, cr):
     if not obfuscated_url or not obfuscated_url.startswith("@y@") or not cr:
         return obfuscated_url
-    
     mapping_orig = " !#$%&()+,-./023456789:;<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ[^_abcdefghijklmnopqrstuvwxz{}~"
     url = obfuscated_url[3:]
     decoded = ""
-    
     for char in url:
         index = cr.find(char)
-        if index != -1:
-            decoded += mapping_orig[index]
-        else:
-            decoded += char
-            
+        if index != -1: decoded += mapping_orig[index]
+        else: decoded += char
     return decoded.replace("@yy1111@", "https://").replace("@yy111@", "https://www.").replace("@yy11@", "http://").replace("@yy1@", "http://www.")
 
 def get_channels():
     app_id = "3713506"
-    # Servidores capturados do motor Smali do GehTV
-    servers = [f"srv{i}.e-droid.net" for i in range(11, 20)]
-    random.shuffle(servers)
+    # O GehTV usa o srv15 com frequência, vamos tentar ele e o principal
+    urls = [
+        f"https://config.e-droid.net/srv/config.php?v=260&idapp={app_id}",
+        f"https://srv15.e-droid.net/srv/config.php?v=260&idapp={app_id}",
+        f"http://config.e-droid.net/srv/config.php?v=260&idapp={app_id}" # Tentando HTTP puro
+    ]
     
     headers = {
         'User-Agent': 'Android Vinebre Software',
@@ -37,71 +35,53 @@ def get_channels():
         'Connection': 'keep-alive'
     }
 
-    for server in servers:
-        # v=228 extraído do Smali (VSOURCE = 0xe4)
-        config_url = f"https://{server}/srv/config.php?v=228&idapp={app_id}"
+    for url in urls:
         try:
-            logger.info(f"Conectando a: {server}")
-            # timeout aumentado para 20s para evitar erro no Railway
-            response = requests.get(config_url, headers=headers, timeout=20, verify=True)
+            logger.info(f"==> Tentando URL: {url}")
+            # verify=False ignora erros de certificado SSL que o Railway às vezes tem
+            response = requests.get(url, headers=headers, timeout=15, verify=False)
+            
+            logger.info(f"Resposta HTTP: {response.status_code}")
             
             if response.status_code != 200:
-                logger.warning(f"Servidor {server} negou acesso (Status {response.status_code})")
+                continue
+
+            # DIAGNÓSTICO: Se não for JSON, imprime os primeiros 300 caracteres do que veio
+            if "json" not in response.headers.get("Content-Type", "").lower():
+                logger.error(f"O servidor nao mandou JSON. Resposta: {response.text[:300]}")
                 continue
 
             data = response.json()
             cr = data.get("cr", "")
             secciones = data.get("secciones", [])
             
-            # Secciones pode vir como dicionário {"0":{...}, "1":{...}} ou lista [...]
-            if isinstance(secciones, dict):
-                secciones = list(secciones.values())
+            if isinstance(secciones, dict): secciones = list(secciones.values())
 
             channels = []
-
-            # Função para varrer todas as subseções (TV > Variedades > Canais)
-            def find_video_recursively(items):
-                found = []
-                if not items: return found
-                
-                # Garante que estamos iterando uma lista
-                current_items = list(items.values()) if isinstance(items, dict) else items
-                
-                for item in current_items:
-                    tipo = str(item.get("tipo", ""))
-                    url_raw = item.get("url", "")
-                    tit = item.get("tit", "Canal")
-
-                    # Tipo 6 é vídeo (canal de TV)
-                    if tipo == "6" and url_raw:
-                        found.append({
-                            "name": tit,
-                            "url": decode_url(url_raw, cr)
-                        })
-                        logger.info(f"Canal detectado: {tit}")
+            
+            # Varredura Recursiva Completa
+            def scan(items):
+                res = []
+                for item in (items.values() if isinstance(items, dict) else items):
+                    # Pega canais (tipo 6)
+                    if str(item.get("tipo")) == "6" and item.get("url"):
+                        res.append({"name": item.get("tit", "Canal"), "url": decode_url(item.get("url"), cr)})
                     
-                    # Procura dentro de menus ou atributos extras (recursividade)
+                    # Entra em submenus (TV > Variedades)
                     for key in ["atribs", "submenu_items", "items"]:
-                        if key in item:
-                            found.extend(find_video_recursively(item[key]))
-                return found
+                        if key in item: res.extend(scan(item[key]))
+                return res
 
-            channels = find_video_recursively(secciones)
-
+            channels = scan(secciones)
+            
             if channels:
-                logger.info(f"Total de {len(channels)} canais capturados!")
+                logger.info(f"Sucesso: {len(channels)} canais extraidos de {url}")
                 return channels
             else:
-                logger.warning(f"O servidor {server} respondeu, mas não há canais tipo 6 ativos.")
+                logger.warning(f"Nenhum canal tipo 6 achado no JSON de {url}")
 
         except Exception as e:
-            logger.error(f"Erro de conexão no {server}: {str(e)}")
+            logger.error(f"Erro ao acessar {url}: {str(e)}")
             continue
 
-    logger.critical("FALHA TOTAL: O backend do GehTV recusou todas as tentativas.")
     return []
-
-if __name__ == "__main__":
-    chans = get_channels()
-    for c in chans:
-        print(f"CANAL: {c['name']} | URL: {c['url']}")
