@@ -3,25 +3,34 @@ import json
 import logging
 import random
 
+# Configuração de logs para você ver no painel do Railway
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def decode_url(obfuscated_url, cr):
     if not obfuscated_url or not obfuscated_url.startswith("@y@") or not cr:
         return obfuscated_url
+    
     mapping_orig = " !#$%&()+,-./023456789:;<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ[^_abcdefghijklmnopqrstuvwxz{}~"
     url = obfuscated_url[3:]
     decoded = ""
+    
     for char in url:
         index = cr.find(char)
-        if index != -1: decoded += mapping_orig[index]
-        else: decoded += char
-    return decoded.replace("@yy1111@", "https://").replace("@yy111@", "https://www.").replace("@yy11@", "http://").replace("@yy1@", "http://www.")
+        if index != -1:
+            decoded += mapping_orig[index]
+        else:
+            decoded += char
+            
+    # Correção de protocolos
+    decoded = decoded.replace("@yy1111@", "https://").replace("@yy111@", "https://www.").replace("@yy11@", "http://").replace("@yy1@", "http://www.")
+    return decoded
 
 def get_channels():
     app_id = "3713506"
-    # O servidor config.e-droid.net é o balanceador principal
-    url = f"https://config.e-droid.net/srv/config.php?v=260&idapp={app_id}"
+    # Servidores do AppCreator24 capturados do Smali
+    servers = [f"srv{i}.e-droid.net" for i in range(11, 20)]
+    random.shuffle(servers)
     
     headers = {
         'User-Agent': 'Android Vinebre Software',
@@ -29,55 +38,68 @@ def get_channels():
         'Connection': 'keep-alive'
     }
 
-    try:
-        logger.info(f"Buscando config em: {url}")
-        # timeout longo e verify=False para evitar travas no Railway
-        response = requests.get(url, headers=headers, timeout=20, verify=False)
-        
-        if response.status_code != 200:
-            logger.error(f"Erro no servidor: {response.status_code}")
-            return []
-
-        data = response.json()
-        cr = data.get("cr", "")
-        secciones = data.get("secciones", [])
-        
-        if isinstance(secciones, dict):
-            secciones = list(secciones.values())
-
-        channels = []
-        
-        # O GehTV tem canais em vários lugares. Vamos varrer TUDO.
-        for s in secciones:
-            tipo = str(s.get("tipo", ""))
-            tit = s.get("tit", "Sem Nome")
+    for server in servers:
+        # Usando a versão v=260 que é a mais estável para submenus
+        config_url = f"https://{server}/srv/config.php?v=260&idapp={app_id}"
+        try:
+            logger.info(f"==> Tentando capturar de: {server}")
+            response = requests.get(config_url, headers=headers, timeout=15)
             
-            # Caso 1: Canal direto (Tipo 6)
-            if tipo == "6":
-                url_raw = s.get("url", "")
-                if url_raw:
-                    channels.append({"name": tit, "url": decode_url(url_raw, cr)})
+            if response.status_code != 200:
+                continue
+
+            data = response.json()
+            cr = data.get("cr", "")
+            secciones = data.get("secciones", [])
             
-            # Caso 2: Canais dentro de Submenus ou Listas (Deep Scan)
-            # Procuramos por campos comuns onde o AppCreator24 guarda sub-itens
-            for key in ["atribs", "submenu_items", "items"]:
-                sub_items = s.get(key, [])
-                if isinstance(sub_items, dict): sub_items = sub_items.values()
+            if isinstance(secciones, dict):
+                secciones = list(secciones.values())
+
+            all_channels = []
+
+            # Função interna para vasculhar itens aninhados (Categorias dentro de Categorias)
+            def scan_recursive(items):
+                found = []
+                if not items: return found
                 
-                for item in sub_items:
-                    # Se o item dentro da categoria tiver uma URL de vídeo
-                    item_url = item.get("url", "")
-                    if item_url.startswith("@y@") or ".m3u8" in item_url:
-                        item_tit = item.get("tit", tit)
-                        channels.append({"name": item_tit, "url": decode_url(item_url, cr)})
+                # Garante que items seja uma lista
+                if isinstance(items, dict): items = items.values()
 
-        if not channels:
-            # DEBUG: Se não achar nada, imprime as seções que o servidor mandou
-            nomes = [s.get("tit") for s in secciones]
-            logger.warning(f"Nenhum canal achado. Seções lidas: {nomes}")
+                for item in items:
+                    tipo = str(item.get("tipo", ""))
+                    tit = item.get("tit", "Canal")
+                    url_raw = item.get("url", "")
 
-        return channels
+                    # Se for tipo 6 (Vídeo), é um canal
+                    if tipo == "6" and url_raw:
+                        found.append({
+                            "name": tit,
+                            "url": decode_url(url_raw, cr)
+                        })
+                        logger.info(f"Canal encontrado: {tit}")
 
-    except Exception as e:
-        logger.error(f"Erro geral no bot: {str(e)}")
-        return []
+                    # Se tiver sub-itens (submenu), vasculha dentro deles
+                    # Campos comuns no AppCreator24 para sub-itens:
+                    for sub_key in ["submenu_items", "atribs", "items"]:
+                        if sub_key in item:
+                            found.extend(scan_recursive(item[sub_key]))
+                return found
+
+            # Inicia a busca em todas as seções do app
+            all_channels = scan_recursive(secciones)
+
+            if all_channels:
+                logger.info(f"Sucesso: {len(all_channels)} canais capturados no total.")
+                return all_channels
+            else:
+                logger.warning(f"Nenhum canal tipo 6 encontrado no servidor {server}.")
+
+        except Exception as e:
+            logger.error(f"Erro no servidor {server}: {str(e)}")
+            continue
+
+    return []
+
+if __name__ == "__main__":
+    # Teste local
+    print(get_channels())
