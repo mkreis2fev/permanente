@@ -3,7 +3,7 @@ import json
 import logging
 import random
 
-# Configuração de logs para você ver no painel do Railway
+# Configura logs detalhados
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -22,84 +22,86 @@ def decode_url(obfuscated_url, cr):
         else:
             decoded += char
             
-    # Correção de protocolos
-    decoded = decoded.replace("@yy1111@", "https://").replace("@yy111@", "https://www.").replace("@yy11@", "http://").replace("@yy1@", "http://www.")
-    return decoded
+    return decoded.replace("@yy1111@", "https://").replace("@yy111@", "https://www.").replace("@yy11@", "http://").replace("@yy1@", "http://www.")
 
 def get_channels():
     app_id = "3713506"
-    # Servidores do AppCreator24 capturados do Smali
+    # Servidores capturados do motor Smali do GehTV
     servers = [f"srv{i}.e-droid.net" for i in range(11, 20)]
     random.shuffle(servers)
     
     headers = {
         'User-Agent': 'Android Vinebre Software',
         'Accept': '*/*',
+        'Accept-Language': 'pt-BR,pt;q=0.9',
         'Connection': 'keep-alive'
     }
 
     for server in servers:
-        # Usando a versão v=260 que é a mais estável para submenus
-        config_url = f"https://{server}/srv/config.php?v=260&idapp={app_id}"
+        # v=228 extraído do Smali (VSOURCE = 0xe4)
+        config_url = f"https://{server}/srv/config.php?v=228&idapp={app_id}"
         try:
-            logger.info(f"==> Tentando capturar de: {server}")
-            response = requests.get(config_url, headers=headers, timeout=15)
+            logger.info(f"Conectando a: {server}")
+            # timeout aumentado para 20s para evitar erro no Railway
+            response = requests.get(config_url, headers=headers, timeout=20, verify=True)
             
             if response.status_code != 200:
+                logger.warning(f"Servidor {server} negou acesso (Status {response.status_code})")
                 continue
 
             data = response.json()
             cr = data.get("cr", "")
             secciones = data.get("secciones", [])
             
+            # Secciones pode vir como dicionário {"0":{...}, "1":{...}} ou lista [...]
             if isinstance(secciones, dict):
                 secciones = list(secciones.values())
 
-            all_channels = []
+            channels = []
 
-            # Função interna para vasculhar itens aninhados (Categorias dentro de Categorias)
-            def scan_recursive(items):
+            # Função para varrer todas as subseções (TV > Variedades > Canais)
+            def find_video_recursively(items):
                 found = []
                 if not items: return found
                 
-                # Garante que items seja uma lista
-                if isinstance(items, dict): items = items.values()
-
-                for item in items:
+                # Garante que estamos iterando uma lista
+                current_items = list(items.values()) if isinstance(items, dict) else items
+                
+                for item in current_items:
                     tipo = str(item.get("tipo", ""))
-                    tit = item.get("tit", "Canal")
                     url_raw = item.get("url", "")
+                    tit = item.get("tit", "Canal")
 
-                    # Se for tipo 6 (Vídeo), é um canal
+                    # Tipo 6 é vídeo (canal de TV)
                     if tipo == "6" and url_raw:
                         found.append({
                             "name": tit,
                             "url": decode_url(url_raw, cr)
                         })
-                        logger.info(f"Canal encontrado: {tit}")
-
-                    # Se tiver sub-itens (submenu), vasculha dentro deles
-                    # Campos comuns no AppCreator24 para sub-itens:
-                    for sub_key in ["submenu_items", "atribs", "items"]:
-                        if sub_key in item:
-                            found.extend(scan_recursive(item[sub_key]))
+                        logger.info(f"Canal detectado: {tit}")
+                    
+                    # Procura dentro de menus ou atributos extras (recursividade)
+                    for key in ["atribs", "submenu_items", "items"]:
+                        if key in item:
+                            found.extend(find_video_recursively(item[key]))
                 return found
 
-            # Inicia a busca em todas as seções do app
-            all_channels = scan_recursive(secciones)
+            channels = find_video_recursively(secciones)
 
-            if all_channels:
-                logger.info(f"Sucesso: {len(all_channels)} canais capturados no total.")
-                return all_channels
+            if channels:
+                logger.info(f"Total de {len(channels)} canais capturados!")
+                return channels
             else:
-                logger.warning(f"Nenhum canal tipo 6 encontrado no servidor {server}.")
+                logger.warning(f"O servidor {server} respondeu, mas não há canais tipo 6 ativos.")
 
         except Exception as e:
-            logger.error(f"Erro no servidor {server}: {str(e)}")
+            logger.error(f"Erro de conexão no {server}: {str(e)}")
             continue
 
+    logger.critical("FALHA TOTAL: O backend do GehTV recusou todas as tentativas.")
     return []
 
 if __name__ == "__main__":
-    # Teste local
-    print(get_channels())
+    chans = get_channels()
+    for c in chans:
+        print(f"CANAL: {c['name']} | URL: {c['url']}")
