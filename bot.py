@@ -7,23 +7,26 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def decode_url(obfuscated_url, cr):
-    if not obfuscated_url.startswith("@y@") or not cr:
+    if not obfuscated_url or not obfuscated_url.startswith("@y@") or not cr:
         return obfuscated_url
+    
     mapping_orig = " !#$%&()+,-./023456789:;<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ[^_abcdefghijklmnopqrstuvwxz{}~"
     url = obfuscated_url[3:]
     decoded = ""
+    
     for char in url:
         index = cr.find(char)
         if index != -1:
             decoded += mapping_orig[index]
         else:
             decoded += char
+            
     return decoded.replace("@yy1111@", "https://").replace("@yy111@", "https://www.").replace("@yy11@", "http://").replace("@yy1@", "http://www.")
 
 def get_channels():
     app_id = "3713506"
-    # Servidores mapeados no Smali
-    servers = [f"srv{i}.e-droid.net" for i in range(11, 21)]
+    # Servidores possíveis baseados no motor AppCreator24
+    servers = [f"srv{i}.e-droid.net" for i in range(11, 20)]
     random.shuffle(servers)
     
     headers = {
@@ -35,51 +38,61 @@ def get_channels():
     for server in servers:
         config_url = f"https://{server}/srv/config.php?v=228&idapp={app_id}"
         try:
-            logger.info(f"==> Verificando servidor: {server}")
+            logger.info(f"==> Analisando Servidor: {server}")
             response = requests.get(config_url, headers=headers, timeout=15)
             
             if response.status_code != 200:
                 continue
 
-            data = response.json()
+            # Se a resposta não for JSON, o IP pode estar bloqueado ou redirecionado
+            try:
+                data = response.json()
+            except:
+                logger.warning(f"Resposta de {server} não é um JSON válido. Verifique os logs de rede.")
+                continue
+
             cr = data.get("cr", "")
             secciones = data.get("secciones", [])
             
-            # AppCreator24 pode mandar como lista ou dicionário
             if isinstance(secciones, dict):
-                secciones = secciones.values()
+                secciones = list(secciones.values())
 
             channels = []
-            
-            logger.info(f"Total de seções encontradas no app: {len(secciones)}")
+            logger.info(f"Capturadas {len(secciones)} seções totais no App.")
 
             for section in secciones:
                 tipo = str(section.get("tipo", ""))
-                nome = section.get("tit", "Sem nome")
-                
-                # Tipo 6 é o tipo padrão de VÍDEO/STREAMING no GehTV
-                # Buscamos em todas as seções, mesmo as que não estão no menu principal
-                if tipo == "6":
-                    url_raw = section.get("url", "")
-                    if url_raw:
-                        url_decodificada = decode_url(url_raw, cr)
-                        logger.info(f"Canal encontrado: {nome}")
-                        channels.append({"name": nome, "url": url_decodificada})
-                
-                # Algumas vezes os canais são do tipo 1 (Web) mas apontam para um player
-                elif tipo == "1":
-                    url_web = section.get("url", "")
-                    if ".m3u8" in url_web or ".mp4" in url_web:
-                        channels.append({"name": nome, "url": url_web})
+                tit = section.get("tit", "").upper()
+                url_raw = section.get("url", "")
+
+                # 1. Busca Canais Diretos (Tipo 6 - Vídeo)
+                if tipo == "6" and url_raw:
+                    url_dec = decode_url(url_raw, cr)
+                    channels.append({"name": section.get("tit", "Canal"), "url": url_dec})
+                    logger.info(f"[CANAL] Encontrado: {section.get('tit')}")
+
+                # 2. Busca Canais em Categorias Web (Tipo 1) que contenham links de stream
+                elif tipo == "1" and url_raw:
+                    if ".m3u8" in url_raw or "stream" in url_raw or "cnd" in url_raw:
+                        channels.append({"name": section.get("tit", "Canal Web"), "url": url_raw})
+                        logger.info(f"[WEB-STREAM] Encontrado: {section.get('tit')}")
+
+                # 3. Diagnóstico de Menus (Tipo 12)
+                elif tipo == "12":
+                    logger.info(f"[MENU] Categoria encontrada: {tit}")
 
             if channels:
-                logger.info(f"Sucesso! Total de {len(channels)} canais capturados.")
+                logger.info(f"Sucesso: {len(channels)} canais capturados no total.")
                 return channels
             else:
-                logger.warning(f"Nenhum canal tipo 6 encontrado em {server}. Seções disponíveis: {[s.get('tit') for s in secciones]}")
+                # Se chegou aqui, ele leu o JSON mas não achou "tipo 6"
+                logger.error("JSON lido com sucesso, mas nenhum canal 'tipo 6' foi encontrado dentro dele.")
+                # Vamos logar os tipos que ele achou para entender a estrutura
+                tipos_achados = set([str(s.get("tipo")) for s in secciones])
+                logger.info(f"Tipos de seções presentes neste App: {tipos_achados}")
 
         except Exception as e:
-            logger.error(f"Erro no servidor {server}: {str(e)}")
+            logger.error(f"Erro ao conectar com {server}: {str(e)}")
             continue
 
     return []
@@ -87,4 +100,4 @@ def get_channels():
 if __name__ == "__main__":
     chans = get_channels()
     for c in chans:
-        print(f"{c['name']} -> {c['url']}")
+        print(f"{c['name']}: {c['url']}")
