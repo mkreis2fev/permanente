@@ -3,7 +3,6 @@ import json
 import logging
 import random
 
-# Forçar exibição de logs no nível máximo
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -23,63 +22,69 @@ def decode_url(obfuscated_url, cr):
 
 def get_channels():
     app_id = "3713506"
-    # Tenta vários subdomínios e também o domínio direto
+    # Servidores mapeados no Smali
     servers = [f"srv{i}.e-droid.net" for i in range(11, 21)]
-    servers.append("config.e-droid.net")
     random.shuffle(servers)
     
     headers = {
         'User-Agent': 'Android Vinebre Software',
-        'Accept-Encoding': 'gzip',
-        'Connection': 'Keep-Alive'
+        'Accept': '*/*',
+        'Connection': 'keep-alive'
     }
 
     for server in servers:
-        # A URL exata que o app usa
         config_url = f"https://{server}/srv/config.php?v=228&idapp={app_id}"
         try:
-            logger.info(f"==> Testando: {server}")
-            # verify=False ignora erros de SSL que às vezes o Railway tem com a e-droid
-            response = requests.get(config_url, headers=headers, timeout=12, verify=True)
+            logger.info(f"==> Verificando servidor: {server}")
+            response = requests.get(config_url, headers=headers, timeout=15)
             
-            logger.info(f"Resposta de {server}: {response.status_code}")
-            
-            if response.status_code == 200:
-                try:
-                    data = response.json()
-                except:
-                    # Se falhar o JSON, vamos ver o que veio no texto (pode ser um erro do Cloudflare)
-                    logger.warning(f"Recebido texto em vez de JSON: {response.text[:100]}")
-                    continue
+            if response.status_code != 200:
+                continue
 
-                cr = data.get("cr", "")
-                secciones = data.get("secciones", [])
-                
-                if isinstance(secciones, dict):
-                    secciones = secciones.values()
-
-                channels = []
-                for section in secciones:
-                    # TIPO 6 = TV/VÍDEO
-                    if str(section.get("tipo")) == "6":
-                        name = section.get("tit", "Canal")
-                        url_raw = section.get("url", "")
-                        if url_raw:
-                            channels.append({"name": name, "url": decode_url(url_raw, cr)})
-                
-                if channels:
-                    logger.info(f"SUCESSO! {len(channels)} canais encontrados no {server}")
-                    return channels
+            data = response.json()
+            cr = data.get("cr", "")
+            secciones = data.get("secciones", [])
             
-            elif response.status_code == 403:
-                logger.error(f"BLOQUEIO: O IP do Railway foi banido pelo {server}")
+            # AppCreator24 pode mandar como lista ou dicionário
+            if isinstance(secciones, dict):
+                secciones = secciones.values()
+
+            channels = []
+            
+            logger.info(f"Total de seções encontradas no app: {len(secciones)}")
+
+            for section in secciones:
+                tipo = str(section.get("tipo", ""))
+                nome = section.get("tit", "Sem nome")
                 
+                # Tipo 6 é o tipo padrão de VÍDEO/STREAMING no GehTV
+                # Buscamos em todas as seções, mesmo as que não estão no menu principal
+                if tipo == "6":
+                    url_raw = section.get("url", "")
+                    if url_raw:
+                        url_decodificada = decode_url(url_raw, cr)
+                        logger.info(f"Canal encontrado: {nome}")
+                        channels.append({"name": nome, "url": url_decodificada})
+                
+                # Algumas vezes os canais são do tipo 1 (Web) mas apontam para um player
+                elif tipo == "1":
+                    url_web = section.get("url", "")
+                    if ".m3u8" in url_web or ".mp4" in url_web:
+                        channels.append({"name": nome, "url": url_web})
+
+            if channels:
+                logger.info(f"Sucesso! Total de {len(channels)} canais capturados.")
+                return channels
+            else:
+                logger.warning(f"Nenhum canal tipo 6 encontrado em {server}. Seções disponíveis: {[s.get('tit') for s in secciones]}")
+
         except Exception as e:
-            logger.error(f"Erro de conexão com {server}: {str(e)}")
+            logger.error(f"Erro no servidor {server}: {str(e)}")
             continue
 
-    logger.critical("NENHUM SERVIDOR RESPONDEU. Possível bloqueio total de IP.")
     return []
 
 if __name__ == "__main__":
-    print(get_channels())
+    chans = get_channels()
+    for c in chans:
+        print(f"{c['name']} -> {c['url']}")
