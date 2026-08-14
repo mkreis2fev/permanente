@@ -3,7 +3,8 @@ from flask_cors import CORS
 import requests
 import re
 import os
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
+import base64
 
 app = Flask(__name__)
 CORS(app)
@@ -154,28 +155,46 @@ LINKS = [
     {"name": "24H Todo Mundo Odeia o Cris", "url": "https://sinalpublicoetv.vercel.app/?id=24h_odeiachris", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/24h.png"}
 ]
 
-def extrair_canais(link_info):
-    url = link_info["url"]
-    nome_padrao = link_info.get("name", "Canal TV")
-    logo = link_info.get("logo", "")
-
-    canais = []
+def extrair_real_stream(vercel_url):
+    """Tenta extrair o link M3U8 real de dentro da página da Vercel"""
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Referer': 'https://sinalpublicoetv.vercel.app/'
     }
     try:
-        # Tenta verificar se o link é um M3U8 direto (como o seu link .txt anterior)
-        response = requests.get(url, headers=headers, timeout=5)
-        if response.status_code == 200 and "#EXTM3U" in response.text:
-            link_proxy = f"{request.url_root}play.m3u8?u={url}"
-            canais.append({"name": nome_padrao, "url": link_proxy, "logo": logo})
-        else:
-            # Para links que abrem páginas web, retornamos o link direto
-            canais.append({"name": nome_padrao, "url": url, "logo": logo})
-    except Exception:
-        canais.append({"name": nome_padrao, "url": url, "logo": logo})
+        response = requests.get(vercel_url, headers=headers, timeout=10)
+        html = response.text
 
-    return canais
+        # Procura por links cloudfront ou m3u8 dentro do HTML/Scripts
+        stream_match = re.search(r'(https://[^\s\'"]+\.m3u8[^\s\'"]*)', html)
+        if not stream_match:
+            stream_match = re.search(r'(https://[^\s\'"]+cloudfront[^\s\'"]+)', html)
+
+        if stream_match:
+            return stream_match.group(1)
+
+        # Tenta procurar links base64 encoded (atob) que muitos sites usam para esconder o link
+        base64_matches = re.findall(r'atob\([\'"]([a-zA-Z0-9+/=]+)[\'"]\)', html)
+        for b in base64_matches:
+            try:
+                decoded = base64.b64decode(b).decode('utf-8')
+                if 'http' in decoded and ('.m3u8' in decoded or 'cloudfront' in decoded):
+                    return decoded
+            except:
+                continue
+    except Exception as e:
+        print(f"Erro ao fazer scrape de {vercel_url}: {e}")
+    return None
+
+def extrair_canais(link_info):
+    url = link_info["url"]
+    nome = link_info.get("name", "Canal")
+    logo = link_info.get("logo", "")
+
+    # Criamos um link de Proxy especial que tentará extrair o vídeo na hora do play
+    link_proxy = f"{request.url_root}play.m3u8?u={url}"
+
+    return [{"name": nome, "url": link_proxy, "logo": logo}]
 
 @app.route('/')
 def index():
@@ -200,15 +219,26 @@ def get_m3u():
     return Response(m3u, mimetype='text/plain')
 
 @app.route('/play.m3u8')
-def proxy_m3u8():
+def proxy_handler():
     target_url = request.args.get('u')
     if not target_url:
         return "URL ausente", 400
+
+    # Se a URL for do Vercel, o scraper tenta encontrar o link real do vídeo (.m3u8)
+    if "vercel.app" in target_url:
+        real_stream = extrair_real_stream(target_url)
+        if real_stream:
+            target_url = real_stream
+        else:
+            return "Não foi possível extrair o vídeo da página web automaticamente", 404
+
+    # Proxy do M3U8 real para resolver caminhos relativos
     headers = {'User-Agent': 'Mozilla/5.0'}
     try:
-        resp = requests.get(target_url, headers=headers)
+        resp = requests.get(target_url, headers=headers, timeout=10)
         parsed_uri = urlparse(target_url)
         domain_base = f"{parsed_uri.scheme}://{parsed_uri.netloc}"
+
         lines = resp.text.splitlines()
         new_lines = []
         for line in lines:
@@ -220,6 +250,7 @@ def proxy_m3u8():
                 new_lines.append(path_base + "/" + line)
             else:
                 new_lines.append(line)
+
         return Response("\n".join(new_lines), mimetype='application/vnd.apple.mpegurl')
     except Exception as e:
         return str(e), 500
