@@ -1,74 +1,73 @@
-import os
+from flask import Flask, jsonify
+from flask_cors import CORS
 import requests
-import logging
-from flask import Flask, Response, jsonify
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+import re
+import os
+import m3u8
 
 app = Flask(__name__)
+CORS(app)
 
-def decode_url(url, cr):
-    if not url or not url.startswith("@y@") or not cr: return url
-    orig = " !#$%&()+,-./023456789:;<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ[^_abcdefghijklmnopqrstuvwxz{}~"
+# Lista de links que você irá mandar
+LINKS = [
+    "https://t5r4e3w2q1y0.s21-cloudfront-net.lat/test/621b3ae6f484f822954cfcdb5e94d66d/file.txt",
+]
+
+def extrair_canais(url):
+    canais = []
     try:
-        d = "".join([orig[cr.find(c)] if c in cr else c for c in url[3:]])
-        return d.replace("@yy1111@", "https://").replace("@yy111@", "https://www.").replace("@yy11@", "http://").replace("@yy1@", "http://www.")
-    except: return url
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            m3u8_obj = m3u8.loads(response.text)
 
-def fetch_channels():
-    # Parâmetros exatos extraídos da engenharia reversa
-    app_id = "3713506"
-    cod_app = "fojywv"
-    v_smali = "228" # Versão original VSOURCE no smali
-    
-    # Tentamos o servidor srv15 que é o mais comum para o GehTV
-    url = f"https://srv15.e-droid.net/srv/config.php?v={v_smali}&idapp={app_id}&cod={cod_app}&p=1"
-    
-    headers = {
-        'User-Agent': 'Android Vinebre Software',
-        'X-Requested-With': 'go.geh',
-        'Accept-Language': 'pt-BR',
-        'Connection': 'Keep-Alive'
-    }
-    
-    try:
-        # verify=False para evitar problemas de SSL no Railway
-        response = requests.get(url, headers=headers, timeout=15, verify=False)
-        
-        if "[APLICNODISP]" in response.text:
-            return []
+            # Caso seja um Master Playlist (várias qualidades do mesmo canal)
+            if m3u8_obj.playlists:
+                for playlist in m3u8_obj.playlists:
+                    name = playlist.stream_info.name or f"Qualidade {playlist.stream_info.bandwidth}"
+                    canais.append({"name": name, "url": playlist.absolute_uri or playlist.uri})
 
-        data = response.json()
-        cr = data.get("cr", "")
-        secciones = data.get("secciones", [])
-        if isinstance(secciones, dict): secciones = list(secciones.values())
+            # Caso seja uma lista de segmentos (canal único) ou lista IPTV
+            elif m3u8_obj.segments:
+                lines = response.text.splitlines()
+                temp_canais = []
+                for i in range(len(lines)):
+                    if lines[i].startswith("#EXTINF"):
+                        info = lines[i]
+                        name_match = re.search(r',([^,]*)$', info)
+                        name = name_match.group(1).strip() if name_match else "Canal"
+                        if i + 1 < len(lines):
+                            link = lines[i+1].strip()
+                            if link.startswith("http"):
+                                temp_canais.append({"name": name, "url": link})
 
-        channels = []
-        def scan(items):
-            for i in items:
-                if not isinstance(i, dict): continue
-                u = i.get("url", "")
-                if (str(i.get("tipo")) == "6" or u.startswith("@y@")) and u:
-                    channels.append({"name": i.get("tit", "Canal"), "url": decode_url(u, cr)})
-                for k in ["atribs", "submenu_items", "items"]:
-                    if k in i and i[k]: scan(i[k])
-        
-        scan(secciones)
-        return channels
-    except: return []
+                if len(temp_canais) > 1:
+                    canais = temp_canais
+                else:
+                    # Se for apenas um stream fragmentado, tratamos o link original como o canal
+                    name = url.split('/')[-2] if len(url.split('/')) > 2 else "Canal TV"
+                    canais.append({"name": name, "url": url})
+            else:
+                canais.append({"name": "Canal", "url": url})
+
+    except Exception as e:
+        print(f"Erro ao processar {url}: {e}")
+    return canais
 
 @app.route('/')
-def home(): return "<h1>Servidor GehTV M3U</h1><p><a href='/lista.m3u'>Lista M3U</a></p>"
+def index():
+    return "Servidor TV Online está ativo! Use /canais para ver a lista."
 
-@app.route('/lista.m3u')
-def generate_m3u():
-    ch = fetch_channels()
-    if not ch: return "O servidor bloqueou o IP do Railway. Use o Render.com", 503
-    m3u = "#EXTM3U\n"
-    for c in ch: m3u += f'#EXTINF:-1 tvg-name="{c["name"]}",{c["name"]}\n{c["url"]}\n'
-    return Response(m3u, mimetype='application/x-mpegURL')
+@app.route('/canais')
+def get_canais():
+    todos_canais = []
+    for link in LINKS:
+        todos_canais.extend(extrair_canais(link))
 
-if __name__ == '__main__':
+    return jsonify({
+        "total": len(todos_canais),
+        "canais": todos_canais
+    })
+
+if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
