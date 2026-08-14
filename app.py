@@ -8,13 +8,150 @@ from urllib.parse import urlparse
 app = Flask(__name__)
 CORS(app)
 
-# Lista de links com nome e logo personalizados
+# Lista completa de canais atualizada
 LINKS = [
-    {
-        "url": "https://t5r4e3w2q1y0.s21-cloudfront-net.lat/test/621b3ae6f484f822954cfcdb5e94d66d/file.txt",
-        "name": "Globo News",
-        "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/globonews.png"
-    }
+    {"name": "Globo News", "url": "https://sinalpublicoetv.vercel.app/?id=globonews", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/globonews.png"},
+    {"name": "Globo RJ", "url": "https://sinalpublicoetv.vercel.app/?id=globorj", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/globo.png"},
+    {"name": "Globo MG", "url": "https://sinalpublicoetv.vercel.app/?id=globomg", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/globo.png"},
+    {"name": "Globo SP", "url": "https://sinalpublicoetv.vercel.app/?id=globosp", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/globo.png"},
+    {"name": "Globo PE", "url": "https://sinalpublicoetv.vercel.app/?id=globope", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/globo.png"},
+    {"name": "Globo PB", "url": "https://sinalpublicoetv.vercel.app/?id=globopb", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/globo.png"},
+    {"name": "Globo RS", "url": "https://sinalpublicoetv.vercel.app/?id=globors", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/globo.png"},
+    {"name": "Globo ES", "url": "https://sinalpublicoetv.vercel.app/?id=globoes", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/globo.png"},
+    {"name": "Globo AM", "url": "https://sinalpublicoetv.vercel.app/?id=globoam", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/globo.png"},
+    {"name": "Globo CE", "url": "https://sinalpublicoetv.vercel.app/?id=globoce", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/globo.png"},
+    {"name": "SportyNet", "url": "https://sinalpublicoetv.vercel.app/?id=sportynet", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/sportynet.png"},
+    {"name": "SportyNet+ 1", "url": "https://sinalpublicoetv.vercel.app/?id=sportynetplus1", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/sportynet.png"},
+    {"name": "SportyNet+ 2", "url": "https://sinalpublicoetv.vercel.app/?id=sportynetplus2", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/sportynet.png"},
+    {"name": "SportyNet+ 3", "url": "https://sinalpublicoetv.vercel.app/?id=sportynetplus3", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/sportynet.png"},
+    {"name": "Paramount+ 1", "url": "https://sinalpublicoetv.vercel.app/?id=paramountplus1", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/paramountplus.png"},
+    {"name": "Paramount+ 2", "url": "https://sinalpublicoetv.vercel.app/?id=paramountplus2", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/paramountplus.png"},
+    {"name": "Paramount+ 3", "url": "https://sinalpublicoetv.vercel.app/?id=paramountplus3", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/paramountplus.png"},
+    {"name": "MAX 1", "url": "https://sinalpublicoetv.vercel.app/?id=max1", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/max.png"},
+    {"name": "MAX 2", "url": "https://sinalpublicoetv.vercel.app/?id=max2", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/max.png"},
+    {"name": "MAX 3", "url": "https://sinalpublicoetv.vercel.app/?id=max3", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/max.png"},
+    {"name": "Cazé TV 1", "url": "https://sinalpublicoetv.vercel.app/?id=caze1", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/cazetv.png"},
+    {"name": "Cazé TV 2", "url": "https://sinalpublicoetv.vercel.app/?id=caze2", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/cazetv.png"},
+    {"name": "Cazé TV 3", "url": "https://sinalpublicoetv.vercel.app/?id=caze3", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/cazetv.png"},
+    {"name": "Disney+ 1", "url": "https://sinalpublicoetv.vercel.app/?id=disneyplus1", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/disneyplus.png"},
+    {"name": "Disney+ 2", "url": "https://sinalpublicoetv.vercel.app/?id=disneyplus2", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/disneyplus.png"},
+    {"name": "Disney+ 3", "url": "https://sinalpublicoetv.vercel.app/?id=disneyplus3", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/disneyplus.png"},
+    {"name": "Prime Video 1", "url": "https://sinalpublicoetv.vercel.app/?id=primevideo", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/prime-video.png"},
+    {"name": "Prime Video 2", "url": "https://sinalpublicoetv.vercel.app/?id=primevideo2", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/prime-video.png"},
+    {"name": "Prime Video 3", "url": "https://sinalpublicoetv.vercel.app/?id=primevideo3", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/prime-video.png"},
+    {"name": "Prime Video 4", "url": "https://sinalpublicoetv.vercel.app/?id=primevideo4", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/prime-video.png"},
+    {"name": "ESPN", "url": "https://sinalpublicoetv.vercel.app/?id=espn", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/espn.png"},
+    {"name": "ESPN 2", "url": "https://sinalpublicoetv.vercel.app/?id=espn2", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/espn-2.png"},
+    {"name": "ESPN 3", "url": "https://sinalpublicoetv.vercel.app/?id=espn3", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/espn-3.png"},
+    {"name": "ESPN 4", "url": "https://sinalpublicoetv.vercel.app/?id=espn4", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/espn-4.png"},
+    {"name": "ESPN 5", "url": "https://sinalpublicoetv.vercel.app/?id=espn5", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/espn-5.png"},
+    {"name": "ESPN 6", "url": "https://sinalpublicoetv.vercel.app/?id=espn6", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/espn-6.png"},
+    {"name": "Ge TV", "url": "https://sinalpublicoetv.vercel.app/?id=getv", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/ge-tv.png"},
+    {"name": "Band Sports", "url": "https://sinalpublicoetv.vercel.app/?id=bandsports", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/band-sports.png"},
+    {"name": "Combate", "url": "https://sinalpublicoetv.vercel.app/?id=combate", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/combate.png"},
+    {"name": "Premiere Clubes", "url": "https://sinalpublicoetv.vercel.app/?id=premiere", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/premiere.png"},
+    {"name": "Premiere 2", "url": "https://sinalpublicoetv.vercel.app/?id=premiere2", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/premiere-2.png"},
+    {"name": "Premiere 3", "url": "https://sinalpublicoetv.vercel.app/?id=premiere3", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/premiere-3.png"},
+    {"name": "Premiere 4", "url": "https://sinalpublicoetv.vercel.app/?id=premiere4", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/premiere-4.png"},
+    {"name": "Premiere 5", "url": "https://sinalpublicoetv.vercel.app/?id=premiere5", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/premiere-5.png"},
+    {"name": "Premiere 6", "url": "https://sinalpublicoetv.vercel.app/?id=premiere6", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/premiere-6.png"},
+    {"name": "Premiere 7", "url": "https://sinalpublicoetv.vercel.app/?id=premiere7", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/premiere-7.png"},
+    {"name": "Premiere 8", "url": "https://sinalpublicoetv.vercel.app/?id=premiere8", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/premiere-8.png"},
+    {"name": "SporTV", "url": "https://sinalpublicoetv.vercel.app/?id=sportv", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/sportv.png"},
+    {"name": "SporTV 2", "url": "https://sinalpublicoetv.vercel.app/?id=sportv2", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/sportv-2.png"},
+    {"name": "SporTV 3", "url": "https://sinalpublicoetv.vercel.app/?id=sportv3", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/sportv-3.png"},
+    {"name": "SporTV 4", "url": "https://sinalpublicoetv.vercel.app/?id=sportv4", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/sportv-4.png"},
+    {"name": "Sporttv 1", "url": "https://sinalpublicoetv.vercel.app/?id=pt_sportv1", "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/38/Logo_SportTV.svg/960px-Logo_SportTV.svg.png"},
+    {"name": "Sporttv 2", "url": "https://sinalpublicoetv.vercel.app/?id=pt_sportv2", "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/38/Logo_SportTV.svg/960px-Logo_SportTV.svg.png"},
+    {"name": "Sporttv 3", "url": "https://sinalpublicoetv.vercel.app/?id=pt_sportv3", "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/38/Logo_SportTV.svg/960px-Logo_SportTV.svg.png"},
+    {"name": "Sporttv 4", "url": "https://sinalpublicoetv.vercel.app/?id=pt_sportv4", "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/38/Logo_SportTV.svg/960px-Logo_SportTV.svg.png"},
+    {"name": "Sporttv 5", "url": "https://sinalpublicoetv.vercel.app/?id=pt_sportv5", "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/38/Logo_SportTV.svg/960px-Logo_SportTV.svg.png"},
+    {"name": "Sporttv 6", "url": "https://sinalpublicoetv.vercel.app/?id=pt_sportv6", "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/38/Logo_SportTV.svg/960px-Logo_SportTV.svg.png"},
+    {"name": "Sporttv 7", "url": "https://sinalpublicoetv.vercel.app/?id=pt_sportv7", "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/38/Logo_SportTV.svg/960px-Logo_SportTV.svg.png"},
+    {"name": "ELEVEN 1", "url": "https://sinalpublicoetv.vercel.app/?id=pt_eleven1", "logo": "https://upload.wikimedia.org/wikipedia/commons/d/d6/Logo_Eleven_Sports_2020.png"},
+    {"name": "ELEVEN 2", "url": "https://sinalpublicoetv.vercel.app/?id=pt_eleven2", "logo": "https://upload.wikimedia.org/wikipedia/commons/d/d6/Logo_Eleven_Sports_2020.png"},
+    {"name": "ELEVEN 3", "url": "https://sinalpublicoetv.vercel.app/?id=pt_eleven3", "logo": "https://upload.wikimedia.org/wikipedia/commons/d/d6/Logo_Eleven_Sports_2020.png"},
+    {"name": "Benfica TV", "url": "https://sinalpublicoetv.vercel.app/?id=pt_benficatv", "logo": "https://upload.wikimedia.org/wikipedia/commons/d/d2/Logo_Benfica_TV.png"},
+    {"name": "A Bola", "url": "https://sinalpublicoetv.vercel.app/?id=pt_abola", "logo": "https://ringiersportsmediagroup.com/wp-content/uploads/2023/07/abola.png"},
+    {"name": "Canal 11", "url": "https://sinalpublicoetv.vercel.app/?id=pt_canal11", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/play-tv.png"},
+    {"name": "UFC Fight Pass", "url": "https://sinalpublicoetv.vercel.app/?id=ufcfightpass", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/ufc.png"},
+    {"name": "XSports", "url": "https://sinalpublicoetv.vercel.app/?id=xsports", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/xsports.png"},
+    {"name": "A&E", "url": "https://sinalpublicoetv.vercel.app/?id=aie", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/aee.png"},
+    {"name": "Adult Swim", "url": "https://sinalpublicoetv.vercel.app/?id=adultswim", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/adult-swim.png"},
+    {"name": "AMC", "url": "https://sinalpublicoetv.vercel.app/?id=amc", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/amc.png"},
+    {"name": "Animal Planet", "url": "https://sinalpublicoetv.vercel.app/?id=animalplanet", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/animal-planet.png"},
+    {"name": "Megapix", "url": "https://sinalpublicoetv.vercel.app/?id=megapix", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/megapix.png"},
+    {"name": "Arte 1", "url": "https://sinalpublicoetv.vercel.app/?id=arte1", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/arte1.png"},
+    {"name": "AXN", "url": "https://sinalpublicoetv.vercel.app/?id=axn", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/axn.png"},
+    {"name": "Band", "url": "https://sinalpublicoetv.vercel.app/?id=band", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/band.png"},
+    {"name": "Band SP", "url": "https://sinalpublicoetv.vercel.app/?id=bandsp", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/band.png"},
+    {"name": "Band RJ", "url": "https://sinalpublicoetv.vercel.app/?id=bandrj", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/band.png"},
+    {"name": "Band News", "url": "https://sinalpublicoetv.vercel.app/?id=bandnews", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/band-news.png"},
+    {"name": "BIS", "url": "https://sinalpublicoetv.vercel.app/?id=bis", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/bis.png"},
+    {"name": "Cultura", "url": "https://sinalpublicoetv.vercel.app/?id=cultura", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/cultura.png"},
+    {"name": "Cartoon Network", "url": "https://sinalpublicoetv.vercel.app/?id=cartoonnetwork", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/cartoon-network.png"},
+    {"name": "Cartoonito", "url": "https://sinalpublicoetv.vercel.app/?id=cartoonito", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/cartoonito.png"},
+    {"name": "Discovery Kids", "url": "https://sinalpublicoetv.vercel.app/?id=discoverykids", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/discovery-kids.png"},
+    {"name": "Gloob", "url": "https://sinalpublicoetv.vercel.app/?id=gloob", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/gloob.png"},
+    {"name": "Cinemax", "url": "https://sinalpublicoetv.vercel.app/?id=cinemax", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/cinemax.png"},
+    {"name": "CNN Brasil", "url": "https://sinalpublicoetv.vercel.app/?id=cnnbrasil", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/cnn.png"},
+    {"name": "Curta!", "url": "https://sinalpublicoetv.vercel.app/?id=curta", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/curta.png"},
+    {"name": "Discovery Channel", "url": "https://sinalpublicoetv.vercel.app/?id=discoverychannel", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/discovery.png"},
+    {"name": "Discovery Home & Health", "url": "https://sinalpublicoetv.vercel.app/?id=discoveryhh", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/discovery-home-and-health.png"},
+    {"name": "Discovery Science", "url": "https://sinalpublicoetv.vercel.app/?id=discoveryscience", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/discovery-science.png"},
+    {"name": "Discovery Theater", "url": "https://sinalpublicoetv.vercel.app/?id=discoverytheather", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/discovery-theater.png"},
+    {"name": "Discovery Turbo", "url": "https://sinalpublicoetv.vercel.app/?id=discoveryturbo", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/discovery-turbo.png"},
+    {"name": "Discovery World", "url": "https://sinalpublicoetv.vercel.app/?id=discoveryworld", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/discovery-world.png"},
+    {"name": "Fish TV", "url": "https://sinalpublicoetv.vercel.app/?id=fishtv", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/fish-tv.png"},
+    {"name": "Food Network", "url": "https://sinalpublicoetv.vercel.app/?id=foodnetwork", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/food-network.png"},
+    {"name": "GNT", "url": "https://sinalpublicoetv.vercel.app/?id=gnt", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/gnt.png"},
+    {"name": "HBO", "url": "https://sinalpublicoetv.vercel.app/?id=hbo", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/hbo.png"},
+    {"name": "HBO 2", "url": "https://sinalpublicoetv.vercel.app/?id=hbo2", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/hbo2.png"},
+    {"name": "HBO Family", "url": "https://sinalpublicoetv.vercel.app/?id=hbofamily", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/hbofamily.png"},
+    {"name": "HBO Mundi", "url": "https://sinalpublicoetv.vercel.app/?id=hbomundi", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/hbomundi.png"},
+    {"name": "HBO Plus", "url": "https://sinalpublicoetv.vercel.app/?id=hboplus", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/hboplus.png"},
+    {"name": "HBO Pop", "url": "https://sinalpublicoetv.vercel.app/?id=hbopop", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/hbopop.png"},
+    {"name": "HBO Xtreme", "url": "https://sinalpublicoetv.vercel.app/?id=hboxtreme", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/hboxtreme.png"},
+    {"name": "HBO Signature", "url": "https://sinalpublicoetv.vercel.app/?id=hbosignathure", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/hbosignature.png"},
+    {"name": "HGTV", "url": "https://sinalpublicoetv.vercel.app/?id=hgtv", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/hgtv.png"},
+    {"name": "History 1", "url": "https://sinalpublicoetv.vercel.app/?id=history", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/history-channel.png"},
+    {"name": "History 2", "url": "https://sinalpublicoetv.vercel.app/?id=history2", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/history-2.png"},
+    {"name": "Lifetime", "url": "https://sinalpublicoetv.vercel.app/?id=lifetime", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/lifetime.png"},
+    {"name": "Modo Viagem", "url": "https://sinalpublicoetv.vercel.app/?id=modoviagem", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/modo-viagem.png"},
+    {"name": "Multishow", "url": "https://sinalpublicoetv.vercel.app/?id=multishow", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/multishow.png"},
+    {"name": "Off", "url": "https://sinalpublicoetv.vercel.app/?id=off", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/canal-off.png"},
+    {"name": "Record News", "url": "https://sinalpublicoetv.vercel.app/?id=recordnews", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/record-tv.png"},
+    {"name": "Record TV", "url": "https://sinalpublicoetv.vercel.app/?id=record", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/record-tv.png"},
+    {"name": "Record SP", "url": "https://sinalpublicoetv.vercel.app/?id=recordsp", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/record-tv.png"},
+    {"name": "Record MG", "url": "https://sinalpublicoetv.vercel.app/?id=recordmg", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/record-tv.png"},
+    {"name": "Record RJ", "url": "https://sinalpublicoetv.vercel.app/?id=recordrj", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/record-tv.png"},
+    {"name": "Rede TV", "url": "https://sinalpublicoetv.vercel.app/?id=redetv", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/redetv.png"},
+    {"name": "SBT", "url": "https://sinalpublicoetv.vercel.app/?id=sbt", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/sbt.png"},
+    {"name": "SBT SP", "url": "https://sinalpublicoetv.vercel.app/?id=sbtsp", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/sbt.png"},
+    {"name": "SBT RJ", "url": "https://sinalpublicoetv.vercel.app/?id=sbtrj", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/sbt.png"},
+    {"name": "SBT News", "url": "https://sinalpublicoetv.vercel.app/?id=sbtnews", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/sbt.png"},
+    {"name": "Sony Channel", "url": "https://sinalpublicoetv.vercel.app/?id=sony", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/sony.png"},
+    {"name": "Space", "url": "https://sinalpublicoetv.vercel.app/?id=space", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/space.png"},
+    {"name": "Studio Universal", "url": "https://sinalpublicoetv.vercel.app/?id=studiouniversal", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/studio-universal.png"},
+    {"name": "Telecine Action", "url": "https://sinalpublicoetv.vercel.app/?id=telecineaction", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/tc-action.png"},
+    {"name": "Telecine Cult", "url": "https://sinalpublicoetv.vercel.app/?id=telecinecult", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/tc-cult.png"},
+    {"name": "Telecine Fun", "url": "https://sinalpublicoetv.vercel.app/?id=telecinefun", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/tc-fun.png"},
+    {"name": "Telecine Pipoca", "url": "https://sinalpublicoetv.vercel.app/?id=telecinepipoca", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/tc-pipoca.png"},
+    {"name": "Telecine Premium", "url": "https://sinalpublicoetv.vercel.app/?id=telecinepremium", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/tc-premium.png"},
+    {"name": "Telecine Touch", "url": "https://sinalpublicoetv.vercel.app/?id=telecinetouch", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/tc-touch.png"},
+    {"name": "TLC", "url": "https://sinalpublicoetv.vercel.app/?id=tlc", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/tlc.png"},
+    {"name": "TNT", "url": "https://sinalpublicoetv.vercel.app/?id=tnt", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/tnt.png"},
+    {"name": "TNT Novelas", "url": "https://sinalpublicoetv.vercel.app/?id=tntnovelas", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/tnt-novelas.png"},
+    {"name": "TNT Series", "url": "https://sinalpublicoetv.vercel.app/?id=tntseries", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/tnt-series.png"},
+    {"name": "Universal TV", "url": "https://sinalpublicoetv.vercel.app/?id=universaltv", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/universal.png"},
+    {"name": "Warner TV", "url": "https://sinalpublicoetv.vercel.app/?id=warnerchannel", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/warner-channel.png"},
+    {"name": "24H PlayBoy", "url": "https://sinalpublicoetv.vercel.app/?id=playboy", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/24h.png"},
+    {"name": "24H SexyHot", "url": "https://sinalpublicoetv.vercel.app/?id=sexyhot", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/24h.png"},
+    {"name": "24H Naruto", "url": "https://sinalpublicoetv.vercel.app/?id=24h_naruto", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/24h.png"},
+    {"name": "24H Dragonball", "url": "https://sinalpublicoetv.vercel.app/?id=24h_dragonball", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/24h.png"},
+    {"name": "24H Os Simpsons", "url": "https://sinalpublicoetv.vercel.app/?id=24h_simpsons", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/24h.png"},
+    {"name": "24H Chaves", "url": "https://sinalpublicoetv.vercel.app/?id=24h_chaves", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/24h.png"},
+    {"name": "24H Todo Mundo Odeia o Cris", "url": "https://sinalpublicoetv.vercel.app/?id=24h_odeiachris", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/24h.png"}
 ]
 
 def extrair_canais(link_info):
@@ -27,25 +164,17 @@ def extrair_canais(link_info):
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     }
     try:
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code == 200:
-            content = response.text
-
-            if "#EXTM3U" in content:
-                # Criamos o link de Proxy para resolver os caminhos internos do vídeo
-                link_proxy = f"{request.url_root}play.m3u8?u={url}"
-                canais.append({
-                    "name": nome_padrao,
-                    "url": link_proxy,
-                    "logo": logo
-                })
-            else:
-                canais.append({"name": nome_padrao, "url": url, "logo": logo})
-    except Exception as e:
-        print(f"Erro ao processar {url}: {e}")
-
-    if not canais:
+        # Tenta verificar se o link é um M3U8 direto (como o seu link .txt anterior)
+        response = requests.get(url, headers=headers, timeout=5)
+        if response.status_code == 200 and "#EXTM3U" in response.text:
+            link_proxy = f"{request.url_root}play.m3u8?u={url}"
+            canais.append({"name": nome_padrao, "url": link_proxy, "logo": logo})
+        else:
+            # Para links que abrem páginas web, retornamos o link direto
+            canais.append({"name": nome_padrao, "url": url, "logo": logo})
+    except Exception:
         canais.append({"name": nome_padrao, "url": url, "logo": logo})
+
     return canais
 
 @app.route('/')
@@ -66,46 +195,35 @@ def get_m3u():
         todos.extend(extrair_canais(link))
     m3u = "#EXTM3U\n"
     for c in todos:
-        # Adiciona o nome e o logo no formato padrão M3U para o player
         logo_attr = f' tvg-logo="{c["logo"]}"' if c.get("logo") else ""
         m3u += f'#EXTINF:-1{logo_attr}, {c["name"]}\n{c["url"]}\n'
     return Response(m3u, mimetype='text/plain')
 
-# ESTA ROTA É O "TRADUTOR" QUE FAZ O VÍDEO FUNCIONAR NO CLOUDFRONT
 @app.route('/play.m3u8')
 def proxy_m3u8():
     target_url = request.args.get('u')
     if not target_url:
         return "URL ausente", 400
-
     headers = {'User-Agent': 'Mozilla/5.0'}
     try:
         resp = requests.get(target_url, headers=headers)
-        
-        # Pega o domínio original para completar os links internos do arquivo .txt
         parsed_uri = urlparse(target_url)
         domain_base = f"{parsed_uri.scheme}://{parsed_uri.netloc}"
-
         lines = resp.text.splitlines()
         new_lines = []
-
         for line in lines:
             line = line.strip()
-            # Resolve caminhos que começam com /
             if line.startswith("/") and not line.startswith("//"):
                 new_lines.append(domain_base + line)
-            # Resolve caminhos relativos sem /
             elif line and not line.startswith("#") and not line.startswith("http"):
                 path_base = target_url.rsplit('/', 1)[0]
                 new_lines.append(path_base + "/" + line)
             else:
                 new_lines.append(line)
-
         return Response("\n".join(new_lines), mimetype='application/vnd.apple.mpegurl')
     except Exception as e:
         return str(e), 500
 
 if __name__ == "__main__":
-    # Porta configurada automaticamente pelo Railway
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
