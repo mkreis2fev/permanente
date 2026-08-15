@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
 import requests
+import re
 import os
 from urllib.parse import urlparse
 import hashlib
@@ -8,14 +9,16 @@ import hashlib
 app = Flask(__name__)
 CORS(app)
 
-# Cabeçalhos obrigatórios para liberar o sinal do Cloudfront
-HEADERS_CLOUD = {
+# CONFIGURAÇÃO DE SEGURANÇA (PARA EVITAR O ERRO 403)
+HEADERS_BYPASS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
     'Referer': 'https://t5r4e3w2q1y0-cloudflare-net.vercel.app/',
-    'Origin': 'https://t5r4e3w2q1y0-cloudflare-net.vercel.app'
+    'Origin': 'https://t5r4e3w2q1y0-cloudflare-net.vercel.app',
+    'Accept': '*/*',
+    'Connection': 'keep-alive'
 }
 
-# Sua lista de canais
+# Lista completa de canais
 LINKS = [
     {"name": "Globo News", "id": "globonews", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/globonews.png"},
     {"name": "Globo RJ", "id": "globorj", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/globo.png"},
@@ -72,19 +75,20 @@ LINKS = [
 
 @app.route('/')
 def index():
-    return "Servidor IPTV Ativo! Use /lista.m3u"
+    return "Servidor IPTV Ativo! Link: /lista.m3u"
 
 @app.route('/lista.m3u')
 def get_m3u():
     m3u = "#EXTM3U\n"
     host = request.host_url.rstrip('/')
     for ch in LINKS:
-        # Geramos o hash MD5 do ID
+        # Geramos o link de vídeo a partir do ID via MD5
         ch_hash = hashlib.md5(ch["id"].encode()).hexdigest()
-        # O arquivo de sinal real
+        # O link do arquivo de sinal real
         target_file = f"https://t5r4e3w2q1y0.s21-cloudfront-net.lat/test/{ch_hash}/file.txt"
+        # Link que passa pelo nosso proxy principal
         link_proxy = f"{host}/play.m3u8?u={target_file}"
-        m3u += f'#EXTINF:-1 tvg-logo="{ch["logo"]}", {ch["name"]}\n{link_proxy}\n'
+        m3u += f'#EXTINF:-1 tvg-id="{ch["id"]}" tvg-logo="{ch["logo"]}", {ch["name"]}\n{link_proxy}\n'
     return Response(m3u, mimetype='text/plain')
 
 @app.route('/play.m3u8')
@@ -93,26 +97,29 @@ def proxy_main():
     if not target_url: return "URL ausente", 400
 
     try:
-        resp = requests.get(target_url, headers=HEADERS_CLOUD, timeout=10)
+        # 1. Busca o conteúdo do file.txt (o manifesto do vídeo)
+        resp = requests.get(target_url, headers=HEADERS_BYPASS, timeout=10)
         
+        # Fallback se a pasta /test/ não existir
         if resp.status_code != 200 and "/test/" in target_url:
             target_url = target_url.replace("/test/", "/")
-            resp = requests.get(target_url, headers=HEADERS_CLOUD, timeout=10)
+            resp = requests.get(target_url, headers=HEADERS_BYPASS, timeout=10)
 
         if resp.status_code != 200:
-             return f"Erro: {resp.status_code}", resp.status_code
+            return f"Erro Cloudfront: {resp.status_code}", resp.status_code
 
+        # 2. Corrige os links internos para que também passem pelo proxy
         parsed_uri = urlparse(target_url)
         domain_base = f"{parsed_uri.scheme}://{parsed_uri.netloc}"
         path_base = target_url.rsplit('/', 1)[0]
-        
         host = request.host_url.rstrip('/')
+        
         lines = resp.text.splitlines()
         new_lines = []
-        
         for line in lines:
             line = line.strip()
             if not line: continue
+            
             if not line.startswith("#"):
                 if line.startswith("http"):
                     full_url = line
@@ -120,8 +127,7 @@ def proxy_main():
                     full_url = domain_base + line
                 else:
                     full_url = path_base + "/" + line
-                
-                # Reescreve cada pedaço para passar pelo nosso proxy
+                # Redireciona cada pedaço do vídeo para nossa rota /segment para injetar os headers
                 new_lines.append(f"{host}/segment?u={full_url}")
             else:
                 new_lines.append(line)
@@ -133,12 +139,14 @@ def proxy_main():
 @app.route('/segment')
 def proxy_segment():
     target_url = request.args.get('u')
+    if not target_url: return "URL ausente", 400
+    
     try:
-        # Envia os headers de liberação para cada pedaço do vídeo
-        resp = requests.get(target_url, headers=HEADERS_CLOUD, stream=True, timeout=15)
+        # Injeta os cabeçalhos de bypass em cada pedaço (segmento) do vídeo
+        resp = requests.get(target_url, headers=HEADERS_BYPASS, stream=True, timeout=15)
         return Response(resp.content, content_type=resp.headers.get('Content-Type', 'video/mp2t'))
     except:
-        return "Erro", 500
+        return "Erro no segmento", 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
