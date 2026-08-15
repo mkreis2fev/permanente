@@ -4,11 +4,12 @@ import requests
 import re
 import os
 from urllib.parse import urlparse
+import hashlib
 
 app = Flask(__name__)
 CORS(app)
 
-# Lista completa de canais atualizada
+# Lista completa de canais (Links originais da Vercel)
 LINKS = [
     {"name": "Globo News", "url": "https://sinalpublicoetv.vercel.app/?id=globonews", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/globonews.png"},
     {"name": "Globo RJ", "url": "https://sinalpublicoetv.vercel.app/?id=globorj", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/globo.png"},
@@ -154,75 +155,89 @@ LINKS = [
     {"name": "24H Todo Mundo Odeia o Cris", "url": "https://sinalpublicoetv.vercel.app/?id=24h_odeiachris", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/24h.png"}
 ]
 
-def extrair_canais(link_info):
-    url = link_info["url"]
-    nome_padrao = link_info.get("name", "Canal TV")
-    logo = link_info.get("logo", "")
-
-    canais = []
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-    }
+def extrair_hls(url):
+    """Resolve o link HLS real a partir da URL da Vercel usando MD5"""
     try:
-        # Tenta verificar se o link é um M3U8 direto (como o seu link .txt anterior)
-        response = requests.get(url, headers=headers, timeout=5)
-        if response.status_code == 200 and "#EXTM3U" in response.text:
-            link_proxy = f"{request.url_root}play.m3u8?u={url}"
-            canais.append({"name": nome_padrao, "url": link_proxy, "logo": logo})
-        else:
-            # Para links que abrem páginas web, retornamos o link direto
-            canais.append({"name": nome_padrao, "url": url, "logo": logo})
-    except Exception:
-        canais.append({"name": nome_padrao, "url": url, "logo": logo})
-
-    return canais
+        channel_id = url.split("id=")[-1]
+        ch_hash = hashlib.md5(channel_id.encode()).hexdigest()
+        # Endereço real de sinal do Cloudfront
+        return f"https://t5r4e3w2q1y0.s21-cloudfront-net.lat/test/{ch_hash}/file.txt"
+    except:
+        return url
 
 @app.route('/')
 def index():
-    return "Servidor TV Online ativo! Use /lista.m3u no seu player."
-
-@app.route('/canais')
-def get_canais():
-    todos = []
-    for link in LINKS:
-        todos.extend(extrair_canais(link))
-    return jsonify({"total": len(todos), "canais": todos})
+    return "Servidor TV Online ATIVO! Use /lista.m3u no seu player."
 
 @app.route('/lista.m3u')
 def get_m3u():
-    todos = []
-    for link in LINKS:
-        todos.extend(extrair_canais(link))
     m3u = "#EXTM3U\n"
-    for c in todos:
-        logo_attr = f' tvg-logo="{c["logo"]}"' if c.get("logo") else ""
-        m3u += f'#EXTINF:-1{logo_attr}, {c["name"]}\n{c["url"]}\n'
+    host = request.host_url.rstrip('/')
+    for item in LINKS:
+        hls_real = extrair_hls(item["url"])
+        # Cria o link que passa pelo nosso servidor proxy
+        link_proxy = f"{host}/play.m3u8?u={hls_real}"
+        m3u += f'#EXTINF:-1 tvg-logo="{item["logo"]}", {item["name"]}\n{link_proxy}\n'
     return Response(m3u, mimetype='text/plain')
 
 @app.route('/play.m3u8')
-def proxy_m3u8():
+def proxy_handler():
     target_url = request.args.get('u')
-    if not target_url:
-        return "URL ausente", 400
-    headers = {'User-Agent': 'Mozilla/5.0'}
+    if not target_url: return "URL ausente", 400
+
+    headers = {
+        'User-Agent': 'Mozilla/5.0',
+        'Referer': 'https://t5r4e3w2q1y0-cloudflare-net.vercel.app/',
+        'Origin': 'https://t5r4e3w2q1y0-cloudflare-net.vercel.app'
+    }
+    
     try:
-        resp = requests.get(target_url, headers=headers)
-        parsed_uri = urlparse(target_url)
-        domain_base = f"{parsed_uri.scheme}://{parsed_uri.netloc}"
+        resp = requests.get(target_url, headers=headers, timeout=15)
+        
+        # Se falhar no /test/, tenta na raiz
+        if resp.status_code != 200 and "/test/" in target_url:
+            target_url = target_url.replace("/test/", "/")
+            resp = requests.get(target_url, headers=headers, timeout=15)
+
+        if resp.status_code != 200:
+             return f"Erro: {resp.status_code}", resp.status_code
+
+        domain_base = f"{urlparse(target_url).scheme}://{urlparse(target_url).netloc}"
+        host = request.host_url.rstrip('/')
+        
         lines = resp.text.splitlines()
         new_lines = []
         for line in lines:
             line = line.strip()
+            if not line: continue
+            
+            # Proxy de cada pedaço (segmento) de video para liberar o play
             if line.startswith("/") and not line.startswith("//"):
-                new_lines.append(domain_base + line)
+                full_url = domain_base + line
+                new_lines.append(f"{host}/segment?u={full_url}")
             elif line and not line.startswith("#") and not line.startswith("http"):
                 path_base = target_url.rsplit('/', 1)[0]
-                new_lines.append(path_base + "/" + line)
+                full_url = path_base + "/" + line
+                new_lines.append(f"{host}/segment?u={full_url}")
             else:
                 new_lines.append(line)
+        
         return Response("\n".join(new_lines), mimetype='application/vnd.apple.mpegurl')
     except Exception as e:
         return str(e), 500
+
+@app.route('/segment')
+def proxy_segment():
+    target_url = request.args.get('u')
+    headers = {
+        'User-Agent': 'Mozilla/5.0',
+        'Referer': 'https://t5r4e3w2q1y0-cloudflare-net.vercel.app/'
+    }
+    try:
+        resp = requests.get(target_url, headers=headers, stream=True, timeout=15)
+        return Response(resp.content, content_type=resp.headers.get('Content-Type', 'video/mp2t'))
+    except:
+        return "Erro", 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
