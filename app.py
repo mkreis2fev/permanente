@@ -8,10 +8,7 @@ import hashlib
 app = Flask(__name__)
 CORS(app)
 
-# A base do servidor de vídeo que descobrimos
-VIDEO_BASE_URL = "https://t5r4e3w2q1y0.s21-cloudfront-net.lat/test/{hash}/file.txt"
-
-# Sua lista de canais baseada no JSON enviado
+# Lista de canais extraída do seu código JSON
 CHANNELS_DATA = [
     {"name":"Globo News","id":"globonews","logo":"https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/globonews.png"},
     {"name":"Globo RJ","id":"globorj","logo":"https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/globo.png"},
@@ -131,7 +128,7 @@ CHANNELS_DATA = [
     {"name":"Rede TV","id":"redetv","logo":"https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/redetv.png"},
     {"name":"SBT","id":"sbt","logo":"https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/sbt.png"},
     {"name":"SBT SP","id":"sbtsp","logo":"https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/sbt.png"},
-    {"name":"SBT RJ","id":"sbtrj","logo":"https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/sbt.png"},
+    {"name":"SBT RJ","id":"sbtrj","logo":"https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/sbtrj.png"},
     {"name":"SBT News","id":"sbtnews","logo":"https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/sbt.png"},
     {"name":"Sony Channel","id":"sony","logo":"https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/sony.png"},
     {"name":"Space","id":"space","logo":"https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/space.png"},
@@ -157,50 +154,54 @@ CHANNELS_DATA = [
     {"name":"24H Todo Mundo Odeia o Cris","id":"24h_odeiachris","logo":"https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/24h.png"}
 ]
 
+BASE_VIDEO_URL = "https://t5r4e3w2q1y0.s21-cloudfront-net.lat"
+
 @app.route('/')
 def index():
-    return "Servidor TV Online ativo! Use /lista.m3u no seu player."
-
-@app.route('/canais')
-def get_canais():
-    todos = []
-    for ch in CHANNELS_DATA:
-        # Gera o link secreto baseado no ID (MD5)
-        ch_hash = hashlib.md5(ch["id"].encode()).hexdigest()
-        stream_url = VIDEO_BASE_URL.format(hash=ch_hash)
-
-        # Link que passa pelo nosso tradutor
-        link_proxy = f"{request.url_root}play.m3u8?u={stream_url}"
-
-        todos.append({
-            "name": ch["name"],
-            "url": link_proxy,
-            "logo": ch["logo"]
-        })
-    return jsonify({"total": len(todos), "canais": todos})
+    return "Servidor TV Online ativo!"
 
 @app.route('/lista.m3u')
 def get_m3u():
     m3u = "#EXTM3U\n"
     for ch in CHANNELS_DATA:
-        ch_hash = hashlib.md5(ch["id"].encode()).hexdigest()
-        stream_url = VIDEO_BASE_URL.format(hash=ch_hash)
-        link_proxy = f"{request.url_root}play.m3u8?u={stream_url}"
-
+        # Geramos o MD5 do ID para cada canal
+        ch_id = ch["id"]
+        ch_hash = hashlib.md5(ch_id.encode()).hexdigest()
+        
+        # Montamos a URL final que o Cloudfront usa
+        video_url = f"{BASE_VIDEO_URL}/test/{ch_hash}/file.txt"
+        
+        # Link que passa pelo nosso tradutor de cabeçalhos
+        link_proxy = f"{request.url_root}play.m3u8?u={video_url}"
+        
         m3u += f'#EXTINF:-1 tvg-logo="{ch["logo"]}", {ch["name"]}\n{link_proxy}\n'
     return Response(m3u, mimetype='text/plain')
 
 @app.route('/play.m3u8')
-def proxy_m3u8():
+def proxy_handler():
     target_url = request.args.get('u')
     if not target_url: return "URL ausente", 400
 
-    headers = {'User-Agent': 'Mozilla/5.0'}
+    # Headers cruciais para que o Cloudfront aceite a requisição
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
+        'Referer': 'https://t5r4e3w2q1y0-cloudflare-net.vercel.app/',
+        'Origin': 'https://t5r4e3w2q1y0-cloudflare-net.vercel.app'
+    }
+    
     try:
-        resp = requests.get(target_url, headers=headers)
+        resp = requests.get(target_url, headers=headers, timeout=10)
+        
+        # Se falhar com /test/, tenta sem (fallback)
+        if resp.status_code != 200:
+             alt_url = target_url.replace("/test/", "/")
+             resp = requests.get(alt_url, headers=headers, timeout=10)
+             if resp.status_code == 200:
+                 target_url = alt_url
+
         parsed_uri = urlparse(target_url)
         domain_base = f"{parsed_uri.scheme}://{parsed_uri.netloc}"
-
+        
         lines = resp.text.splitlines()
         new_lines = []
         for line in lines:
@@ -212,7 +213,7 @@ def proxy_m3u8():
                 new_lines.append(path_base + "/" + line)
             else:
                 new_lines.append(line)
-
+        
         return Response("\n".join(new_lines), mimetype='application/vnd.apple.mpegurl')
     except Exception as e:
         return str(e), 500
@@ -220,3 +221,7 @@ def proxy_m3u8():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
+}
+
+
+Aqui está o código completo do `app.py`, contendo toda a lista de canais e a lógica de processamento de vídeo HLS:
