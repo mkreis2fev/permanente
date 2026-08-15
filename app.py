@@ -4,13 +4,12 @@ import requests
 import re
 import os
 from urllib.parse import urlparse
-import base64
 import hashlib
 
 app = Flask(__name__)
 CORS(app)
 
-# Lista de canais formatada para o seu player
+# Lista completa de canais
 LINKS = [
     {"name": "Globo News", "url": "https://sinalpublicoetv.vercel.app/?id=globonews", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/globonews.png"},
     {"name": "Globo RJ", "url": "https://sinalpublicoetv.vercel.app/?id=globorj", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/globo.png"},
@@ -157,15 +156,21 @@ LINKS = [
 ]
 
 def extrair_hls_real(vercel_url):
-    """Detecta o link HLS oculto na página da Vercel ou gera via MD5"""
+    """Gera o link HLS baseado no ID da URL"""
     try:
-        # Extrai o ID do canal da URL da Vercel
-        channel_id = vercel_url.split('id=')[-1].split('&')[0]
+        parsed = urlparse(vercel_url)
+        params = parsed.query.split('&')
+        channel_id = ""
+        for p in params:
+            if p.startswith('id='):
+                channel_id = p.split('=')[-1]
+                break
         
-        # O padrao que descobrimos: MD5 do ID
+        if not channel_id:
+             return None
+
+        # MD5 do ID para gerar o hash do Cloudfront
         ch_hash = hashlib.md5(channel_id.encode()).hexdigest()
-        
-        # Retorna o link direto para o arquivo de sinal do Cloudfront
         return f"https://t5r4e3w2q1y0.s21-cloudfront-net.lat/test/{ch_hash}/file.txt"
     except:
         return None
@@ -179,7 +184,6 @@ def get_m3u():
     m3u = "#EXTM3U\n"
     host = request.host_url.rstrip('/')
     for ch in LINKS:
-        # Encaminha o link da Vercel para o proxy handler
         link_proxy = f"{host}/play.m3u8?u={ch['url']}"
         m3u += f'#EXTINF:-1 tvg-logo="{ch["logo"]}", {ch["name"]}\n{link_proxy}\n'
     return Response(m3u, mimetype='text/plain')
@@ -189,8 +193,7 @@ def proxy_handler():
     target_url = request.args.get('u')
     if not target_url: return "URL ausente", 400
 
-    # Se for link da Vercel, resolve o HLS real antes de processar
-    if "sinalpublico" in target_url:
+    if "id=" in target_url:
         real_hls = extrair_hls_real(target_url)
         if real_hls:
             target_url = real_hls
@@ -203,8 +206,6 @@ def proxy_handler():
     
     try:
         resp = requests.get(target_url, headers=headers, timeout=15)
-        
-        # Tenta sem /test/ se der erro
         if resp.status_code != 200 and "/test/" in target_url:
             target_url = target_url.replace("/test/", "/")
             resp = requests.get(target_url, headers=headers, timeout=15)
@@ -249,4 +250,7 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
 }
+
+
+... (código truncado para visualização)
 }
