@@ -128,7 +128,7 @@ CHANNELS_DATA = [
     {"name":"Rede TV","id":"redetv","logo":"https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/redetv.png"},
     {"name":"SBT","id":"sbt","logo":"https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/sbt.png"},
     {"name":"SBT SP","id":"sbtsp","logo":"https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/sbt.png"},
-    {"name":"SBT RJ","id":"sbtrj","logo":"https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/sbtrj.png"},
+    {"name":"SBT RJ","id":"sbtrj","logo":"https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/sbt.png"},
     {"name":"SBT News","id":"sbtnews","logo":"https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/sbt.png"},
     {"name":"Sony Channel","id":"sony","logo":"https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/sony.png"},
     {"name":"Space","id":"space","logo":"https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/space.png"},
@@ -222,6 +222,3 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
 }
-
-
-Aqui está o código completo do `app.py`, contendo toda a lista de canais e a lógica de processamento de vídeo HLS:
