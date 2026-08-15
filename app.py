@@ -4,6 +4,7 @@ import requests
 import re
 import os
 from urllib.parse import urlparse
+import base64
 import hashlib
 
 app = Flask(__name__)
@@ -76,7 +77,7 @@ LINKS = [
     {"name": "A Bola", "url": "https://sinalpublicoetv.vercel.app/?id=pt_abola", "logo": "https://ringiersportsmediagroup.com/wp-content/uploads/2023/07/abola.png"},
     {"name": "Canal 11", "url": "https://sinalpublicoetv.vercel.app/?id=pt_canal11", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/play-tv.png"},
     {"name": "UFC Fight Pass", "url": "https://sinalpublicoetv.vercel.app/?id=ufcfightpass", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/ufc.png"},
-    {"name": "XSports", "url": "https://sinalpublicoetv.vercel.app/?id=xsports", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/xsports.png"},
+    {"name": "XSports", "url": "https://sinalpublicoetv.vercel.app/?id=xsports", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/ufc.png"},
     {"name": "A&E", "url": "https://sinalpublicoetv.vercel.app/?id=aie", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/aee.png"},
     {"name": "Adult Swim", "url": "https://sinalpublicoetv.vercel.app/?id=adultswim", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/adult-swim.png"},
     {"name": "AMC", "url": "https://sinalpublicoetv.vercel.app/?id=amc", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/logo/amc.png"},
@@ -155,76 +156,80 @@ LINKS = [
     {"name": "24H Todo Mundo Odeia o Cris", "url": "https://sinalpublicoetv.vercel.app/?id=24h_odeiachris", "logo": "https://d1r94zrla0glo-cloudfront.vercel.app/sinalpublico/foto/embed/24h.png"}
 ]
 
-def extrair_hls(url):
-    """Resolve o link HLS real a partir da URL da Vercel usando MD5"""
+def extrair_hls_dinamico(vercel_url):
+    """Acessa a página da Vercel e captura o link HLS atual do vídeo"""
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+        'Referer': 'https://sinalpublicoetv.vercel.app/'
+    }
     try:
-        channel_id = url.split("id=")[-1]
-        ch_hash = hashlib.md5(channel_id.encode()).hexdigest()
-        # Endereço real de sinal do Cloudfront
-        return f"https://t5r4e3w2q1y0.s21-cloudfront-net.lat/test/{ch_hash}/file.txt"
-    except:
-        return url
+        response = requests.get(vercel_url, headers=headers, timeout=10)
+        html = response.text
+        match = re.search(r'(https://[^\s\'"]+\.(m3u8|txt)[^\s\'"]*)', html)
+        if not match:
+            match = re.search(r'(https://[^\s\'"]+cloudfront[^\s\'"]+)', html)
+        if match:
+            return match.group(1)
+        base64_matches = re.findall(r'atob\([\'"]([a-zA-Z0-9+/=]+)[\'"]\)', html)
+        for b in base64_matches:
+            try:
+                decoded = base64.b64decode(b).decode('utf-8')
+                if 'http' in decoded and ('.m3u8' in decoded or 'cloudfront' in decoded):
+                    return decoded
+            except: continue
+    except: pass
+    return None
 
 @app.route('/')
 def index():
-    return "Servidor TV Online ATIVO! Use /lista.m3u no seu player."
+    return "Servidor TV Online ATIVO!"
 
 @app.route('/lista.m3u')
 def get_m3u():
     m3u = "#EXTM3U\n"
     host = request.host_url.rstrip('/')
-    for item in LINKS:
-        hls_real = extrair_hls(item["url"])
-        # Cria o link que passa pelo nosso servidor proxy
-        link_proxy = f"{host}/play.m3u8?u={hls_real}"
-        m3u += f'#EXTINF:-1 tvg-logo="{item["logo"]}", {item["name"]}\n{link_proxy}\n'
+    for ch in LINKS:
+        link_proxy = f"{host}/play.m3u8?u={ch['url']}"
+        m3u += f'#EXTINF:-1 tvg-logo="{ch["logo"]}", {ch["name"]}\n{link_proxy}\n'
     return Response(m3u, mimetype='text/plain')
 
 @app.route('/play.m3u8')
 def proxy_handler():
-    target_url = request.args.get('u')
-    if not target_url: return "URL ausente", 400
-
+    vercel_url = request.args.get('u')
+    if not vercel_url: return "URL ausente", 400
+    target_url = extrair_hls_dinamico(vercel_url)
+    if not target_url:
+        try:
+            channel_id = vercel_url.split('id=')[-1].split('&')[0]
+            ch_hash = hashlib.md5(channel_id.encode()).hexdigest()
+            target_url = f"https://t5r4e3w2q1y0.s21-cloudfront-net.lat/test/{ch_hash}/file.txt"
+        except: return "Erro", 404
     headers = {
         'User-Agent': 'Mozilla/5.0',
         'Referer': 'https://t5r4e3w2q1y0-cloudflare-net.vercel.app/',
         'Origin': 'https://t5r4e3w2q1y0-cloudflare-net.vercel.app'
     }
-    
     try:
         resp = requests.get(target_url, headers=headers, timeout=15)
-        
-        # Se falhar no /test/, tenta na raiz
         if resp.status_code != 200 and "/test/" in target_url:
             target_url = target_url.replace("/test/", "/")
             resp = requests.get(target_url, headers=headers, timeout=15)
-
-        if resp.status_code != 200:
-             return f"Erro: {resp.status_code}", resp.status_code
-
         domain_base = f"{urlparse(target_url).scheme}://{urlparse(target_url).netloc}"
-        host = request.host_url.rstrip('/')
-        
         lines = resp.text.splitlines()
         new_lines = []
         for line in lines:
             line = line.strip()
             if not line: continue
-            
-            # Proxy de cada pedaço (segmento) de video para liberar o play
             if line.startswith("/") and not line.startswith("//"):
                 full_url = domain_base + line
-                new_lines.append(f"{host}/segment?u={full_url}")
+                new_lines.append(f"{request.host_url.rstrip('/')}/segment?u={full_url}")
             elif line and not line.startswith("#") and not line.startswith("http"):
                 path_base = target_url.rsplit('/', 1)[0]
                 full_url = path_base + "/" + line
-                new_lines.append(f"{host}/segment?u={full_url}")
-            else:
-                new_lines.append(line)
-        
+                new_lines.append(f"{request.host_url.rstrip('/')}/segment?u={full_url}")
+            else: new_lines.append(line)
         return Response("\n".join(new_lines), mimetype='application/vnd.apple.mpegurl')
-    except Exception as e:
-        return str(e), 500
+    except Exception as e: return str(e), 500
 
 @app.route('/segment')
 def proxy_segment():
@@ -236,8 +241,7 @@ def proxy_segment():
     try:
         resp = requests.get(target_url, headers=headers, stream=True, timeout=15)
         return Response(resp.content, content_type=resp.headers.get('Content-Type', 'video/mp2t'))
-    except:
-        return "Erro", 500
+    except: return "Erro", 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
