@@ -1,21 +1,21 @@
-from flask import Flask, render_template, redirect, request
-import requests
-import re
+from flask import Flask, render_template, redirect, send_from_directory
+import os
 
 app = Flask(__name__)
 
-# Rota para a página inicial (seu player)
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# Rota que "captura" ou redireciona para o sinal da Globo News
 @app.route('/globonews')
-def get_globo_news():
-    # Aqui você pode adicionar lógica de scraping para pegar o link .m3u8 real
-    # Por agora, redirecionamos para o player estável que você já usa
-    sinal_url = "https://sinaldvd.github.io/tv/player.html?id=globonews"
-    return redirect(sinal_url)
+def globonews():
+    return redirect("https://sinaldvd.github.io/tv/player.html?id=globonews")
+
+# Rota para o App de IPTV encontrar a playlist
+@app.route('/playlist.m3u')
+def playlist():
+    return send_from_directory('static', 'playlist.m3u')
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
