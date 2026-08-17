@@ -13,7 +13,8 @@ REFERER = "https://sinaldvd.github.io/"
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
     'Referer': REFERER,
-    'Origin': 'https://sinaldvd.github.io'
+    'Origin': 'https://sinaldvd.github.io',
+    'Accept': '*/*',
 }
 
 def get_stream_url(channel_id):
@@ -21,11 +22,10 @@ def get_stream_url(channel_id):
     url = f"{PLAYER_URL}{channel_id}"
     try:
         session = requests.Session()
-        # Aumentamos o timeout e permitimos redirecionamentos
-        response = session.get(url, headers=HEADERS, timeout=15, allow_redirects=True)
+        response = session.get(url, headers=HEADERS, timeout=15)
         content = response.text
 
-        # 1. Procura links em base64 (atob)
+        # 1. Busca por links base64 decodificados (atob)
         b64_matches = re.findall(r'atob\(["\']([^"\']+)["\']\)', content)
         for b64_str in b64_matches:
             try:
@@ -35,13 +35,13 @@ def get_stream_url(channel_id):
                     return m3u8_match.group(1).replace('\\/', '/')
             except: continue
 
-        # 2. Busca direta no HTML por .m3u8
-        match = re.search(r'["\'](https?://[^"\']+\.m3u8[^"\']*)["\']', content)
-        if match:
-            return match.group(1).replace('\\/', '/')
+        # 2. Busca por links diretos no script
+        match = re.search(r'source:\s*["\'](https?://[^"\']+\.m3u8[^"\']*)["\']', content)
+        if not match:
+            match = re.search(r'file:\s*["\'](https?://[^"\']+\.m3u8[^"\']*)["\']', content)
+        if not match:
+            match = re.search(r'["\'](https?://[^"\']+\.m3u8[^"\']*)["\']', content)
 
-        # 3. Busca por strings que pareçam URLs .m3u8 ocultas
-        match = re.search(r'(https?://[^\s\'"]+\.m3u8[^\s\'"]*)', content)
         if match:
             return match.group(1).replace('\\/', '/')
 
@@ -51,19 +51,17 @@ def get_stream_url(channel_id):
 
 @app.route('/')
 def home():
-    return "Servidor IPTV Proxy Rodando. Use o link /playlist.m3u no seu App."
+    return "Servidor IPTV Proxy Rodando. Use /playlist.m3u"
 
 @app.route('/playlist.m3u')
 def playlist():
-    """ Retorna a playlist M3U """
     host = request.host
     scheme = request.scheme
-    
+
     channels = [
         {"id": "globonews", "name": "Globo News", "logo": "https://logodownload.org/wp-content/uploads/2020/03/globo-news-logo.png"},
         {"id": "globorj", "name": "Globo RJ", "logo": "https://logodownload.org/wp-content/uploads/2020/03/rede-globo-logo.png"},
         {"id": "g1", "name": "G1", "logo": "https://logodownload.org/wp-content/uploads/2020/03/g1-logo.png"},
-        # Canal de teste direto para verificar se o app IPTV está funcionando
         {"id": "test", "name": "[TESTE] Big Buck Bunny", "logo": "https://upload.wikimedia.org/wikipedia/commons/c/c5/Big_Buck_Bunny_Logo.png"}
     ]
 
@@ -72,35 +70,28 @@ def playlist():
         m3u += f'#EXTINF:-1 tvg-id="{ch["id"]}" tvg-logo="{ch["logo"]}" group-title="Canais",{ch["name"]}\n'
         m3u += f'{scheme}://{host}/stream/{ch["id"]}\n'
 
-    return Response(m3u, mimetype='application/x-mpegurl', headers={"Content-Disposition": "attachment; filename=playlist.m3u"})
+    return Response(m3u, mimetype='application/x-mpegurl')
 
 @app.route('/stream/<channel_id>')
 def stream(channel_id):
-    # Canal de teste direto
     if channel_id == "test":
         return redirect("http://sample.vodobox.net/skate_phantom_flex_4k/skate_phantom_flex_4k.m3u8")
 
     stream_url = get_stream_url(channel_id)
     if not stream_url:
-        return "Canal Offline ou não encontrado.", 404
+        return "Canal Offline", 404
 
-    # Redireciona para o stream com o Referer anexado
-    # Muitos apps IPTV interpretam o "|" como separador de headers
-    final_url = stream_url
-    if "|" not in final_url:
-        final_url += f"|Referer={REFERER}&User-Agent={HEADERS['User-Agent']}"
-    
-    return redirect(final_url)
+    # Alguns apps IPTV precisam que o Referer e User-Agent sejam passados via URL
+    # Usamos o formato comum: link.m3u8|Referer=...&User-Agent=...
+    suffix = f"|Referer={REFERER}&User-Agent={HEADERS['User-Agent']}"
 
-# Rota para testar no navegador o que o scraper está capturando
+    # Se o link já tem parâmetros, usamos o redirecionamento direto
+    return redirect(stream_url + suffix)
+
 @app.route('/debug/<channel_id>')
 def debug(channel_id):
     url = get_stream_url(channel_id)
-    return jsonify({
-        "channel": channel_id,
-        "captured_url": url,
-        "status": "success" if url else "failed"
-    })
+    return jsonify({"channel": channel_id, "url": url, "status": "ok" if url else "fail"})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
