@@ -1,2 +1,65 @@
-<html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Player</title><link rel="preconnect" href="https://sinaldvd.github.io" crossorigin=""><link rel="preconnect" href="https://sinalpublicoetv.vercel.app" crossorigin=""><script disable-devtool-auto="" src="./scripts/disable-devtools.js"></script><style>:root{ --primary:#007bff; --danger:#ff3b3b; --bg:#000; --card:#111; --text:#fff;}*{ margin:0; padding:0; box-sizing:border-box;}html,body{ width:100%; height:100%; overflow:hidden; background:#000; font-family:Arial, Helvetica, sans-serif;}/* PLAYER */#player{ position:fixed; inset:0; width:100%; height:100%; border:none; background:#000;}/* BOX */.box{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; padding:20px; background:#000; z-index:9999;}.card{ width:100%; max-width:500px; background:var(--card); border-radius:16px; padding:30px; text-align:center; color:#fff; border:1px solid rgba(255,255,255,.08);}.logo{ width:100px; margin-bottom:20px;}.title{ font-size:26px; font-weight:700; margin-bottom:15px; color:var(--primary);}.desc{ font-size:15px; line-height:1.6; opacity:.9; margin-bottom:20px;}.button{ display:inline-flex; align-items:center; justify-content:center; height:46px; padding:0 24px; border-radius:999px; background:var(--primary); color:#fff; text-decoration:none; font-weight:700;}.button:hover{ opacity:.9;}#channel{ margin-top:15px; opacity:.7; font-size:14px;}</style></head><body><iframe id="player" allowfullscreen referrerpolicy="origin" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" src="https://sinaldvd.github.io/tv/player.html?id=globonews"></iframe><div class="box" id="sandbox"><div class="card"><img class="logo" src="./images/iconpage.png" alt="Logo"><div class="title"> Sandbox Detectado </div><div class="desc"> Remova o atributo sandbox do iframe para o player funcionar corretamente. </div><a class="button" href="https://sinalpublic.vercel.app" target="_blank"> Abrir Site </a></div></div><div class="box" id="error"><div class="card"><img class="logo" src="./images/iconpage.png" alt="Logo"><div class="title" style="color:var(--danger)"> Canal Não Encontrado </div><div class="desc"> Não foi possível carregar o canal. </div><div id="channel"></div></div></div><script>eval(decodeURIComponent(escape(atob('KCgpID0+IHsKICBjb25zdCBpZnJhbWUgPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgicGxheWVyIik7CiAgY29uc3QgZXJyb3JCb3ggPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgiZXJyb3IiKTsKICBjb25zdCBzYW5kYm94Qm94ID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoInNhbmRib3giKTsKICBjb25zdCBjaGFubmVsQm94ID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoImNoYW5uZWwiKTsKCiAgY29uc3QgaXNTYW5kYm94ID0gKCgpID0+IHsKICAgIHRyeSB7CiAgICAgIGlmICh3aW5kb3cuZnJhbWVFbGVtZW50Py5oYXNBdHRyaWJ1dGUoInNhbmRib3giKSkgcmV0dXJuIHRydWU7CiAgICAgIGRvY3VtZW50LmRvbWFpbiA9IGRvY3VtZW50LmRvbWFpbjsKICAgICAgcmV0dXJuIGZhbHNlOwogICAgfSBjYXRjaCB7CiAgICAgIHJldHVybiB0cnVlOwogICAgfQogIH0pKCk7CgogIGlmIChpc1NhbmRib3gpIHsKICAgIHNhbmRib3hCb3ggJiYgKHNhbmRib3hCb3guc3R5bGUuZGlzcGxheSA9ICJmbGV4Iik7CiAgICByZXR1cm47CiAgfQoKICBjb25zdCBpZCA9IG5ldyBVUkxTZWFyY2hQYXJhbXMobG9jYXRpb24uc2VhcmNoKS5nZXQoImlkIik7CgogIGlmICghaWQpIHsKICAgIGNoYW5uZWxCb3ggJiYgKGNoYW5uZWxCb3gudGV4dENvbnRlbnQgPSAiTmVuaHVtIElEIGluZm9ybWFkbyIpOwogICAgZXJyb3JCb3ggJiYgKGVycm9yQm94LnN0eWxlLmRpc3BsYXkgPSAiZmxleCIpOwogICAgcmV0dXJuOwogIH0KCiAgaWZyYW1lLnNyYyA9IGBodHRwczovL3NpbmFsZHZkLmdpdGh1Yi5pby90di9wbGF5ZXIuaHRtbD9pZD0ke2VuY29kZVVSSUNvbXBvbmVudChpZCl9YDsKCiAgZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcigiY29udGV4dG1lbnUiLCBlID0+IGUucHJldmVudERlZmF1bHQoKSk7CiAgZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcigia2V5ZG93biIsIGUgPT4gewogICAgaWYgKGUua2V5ID09PSAiRjEyIiB8fCAoZS5jdHJsS2V5ICYmIGUuc2hpZnRLZXkgJiYgImlqYyIuaW5jbHVkZXMoZS5rZXkudG9Mb3dlckNhc2UoKSkpKSB7CiAgICAgIGUucHJldmVudERlZmF1bHQoKTsKICAgIH0KICB9KTsKfSkoKTsK'))));</script><div class="hidden-tools" style="position:absolute; left:-1px; top:-1px; width:1px; height:1px; overflow:hidden;"><script id="_waur4b"> var _wau = _wau || []; _wau.push(["dynamic", "63o9m0yxdl", "x6r", "c4302bffffff", "small"]); </script><script async src="./scripts/d.js"></script></div>
-</body></html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Player - Globo News</title>
+    <link rel="preconnect" href="https://sinaldvd.github.io" crossorigin="">
+    <link rel="preconnect" href="https://sinalpublicoetv.vercel.app" crossorigin="">
+    
+    <!-- Script de proteção ajustado para a pasta static -->
+    <script disable-devtool-auto="" src="/static/scripts/disable-devtools.js"></script>
+    
+    <style>
+        :root { --primary:#007bff; --danger:#ff3b3b; --bg:#000; --card:#111; --text:#fff; }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        html, body { width:100%; height:100%; overflow:hidden; background:#000; font-family:Arial, Helvetica, sans-serif; }
+        
+        /* PLAYER FULLSCREEN */
+        #player { position:fixed; inset:0; width:100%; height:100%; border:none; background:#000; }
+        
+        /* MENSAGENS DE ERRO/SANDBOX */
+        .box { position:fixed; inset:0; display:none; align-items:center; justify-content:center; padding:20px; background:#000; z-index:9999; }
+        .card { width:100%; max-width:500px; background:var(--card); border-radius:16px; padding:30px; text-align:center; color:#fff; border:1px solid rgba(255,255,255,.08); }
+        .logo { width:100px; margin-bottom:20px; }
+        .title { font-size:26px; font-weight:700; margin-bottom:15px; color:var(--primary); }
+        .desc { font-size:15px; line-height:1.6; opacity:.9; margin-bottom:20px; }
+        .button { display:inline-flex; align-items:center; justify-content:center; height:46px; padding:0 24px; border-radius:999px; background:var(--primary); color:#fff; text-decoration:none; font-weight:700; }
+        .button:hover { opacity:.9; }
+        #channel { margin-top:15px; opacity:.7; font-size:14px; }
+    </style>
+</head>
+<body>
+    <!-- O Player carrega o sinal via iframe -->
+    <iframe id="player" allowfullscreen referrerpolicy="origin" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" src="https://sinaldvd.github.io/tv/player.html?id=globonews"></iframe>
+
+    <!-- Alerta de Sandbox -->
+    <div class="box" id="sandbox">
+        <div class="card">
+            <img class="logo" src="/static/images/iconpage.png" alt="Logo">
+            <div class="title"> Sandbox Detectado </div>
+            <div class="desc"> Remova o atributo sandbox do iframe para o player funcionar corretamente. </div>
+            <a class="button" href="https://sinalpublic.vercel.app" target="_blank"> Abrir Site </a>
+        </div>
+    </div>
+
+    <!-- Alerta de Erro -->
+    <div class="box" id="error">
+        <div class="card">
+            <img class="logo" src="/static/images/iconpage.png" alt="Logo">
+            <div class="title" style="color:var(--danger)"> Canal Não Encontrado </div>
+            <div class="desc"> Não foi possível carregar o canal. </div>
+            <div id="channel"></div>
+        </div>
+    </div>
+
+    <script>
+        // Script ofuscado para gerenciar o carregamento do player e proteção
+        eval(decodeURIComponent(escape(atob('KCgpID0+IHsKICBjb25zdCBpZnJhbWUgPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgicGxheWVyIik7CiAgY29uc3QgZXJyb3JCb3ggPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgiZXJyb3IiKTsKICBjb25zdCBzYW5kYm94Qm94ID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoInNhbmRib3giKTsKICBjb25zdCBjaGFubmVsQm94ID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoImNoYW5uZWwiKTsKCiAgY29uc3QgaXNTYW5kYm94ID0gKCgpID0+IHsKICAgIHRyeSB7CiAgICAgIGlmICh3aW5kb3cuZnJhbWVFbGVtZW50Py5oYXNBdHRyaWJ1dGUoInNhbmRib3giKSkgcmV0dXJuIHRydWU7CiAgICAgIGRvY3VtZW50LmRvbWFpbiA9IGRvY3VtZW50LmRvbWFpbjsKICAgICAgcmV0dXJuIGZhbHNlOwogICAgfSBjYXRjaCB7CiAgICAgIHJldHVybiB0cnVlOwogICAgfQogIH0pKCk7CgogIGlmIChpc1NhbmRib3gpIHsKICAgIHNhbmRib3hCb3ggJiYgKHNhbmRib3hCb3guc3R5bGUuZGlzcGxheSA9ICJmbGV4Iik7CiAgICByZXR1cm47CiAgfQoKICBjb25zdCBpZCA9IG5ldyBVUkxTZWFyY2hQYXJhbXMobG9jYXRpb24uc2VhcmNoKS5nZXQoImlkIik7CgogIGlmICghaWQpIHsKICAgIGNoYW5uZWxCb3ggJiYgKGNoYW5uZWxCb3gudGV4dENvbnRlbnQgPSAiTmVuaHVtIElEIGluZm9ybWFkbyIpOwogICAgZXJyb3JCb3ggJiYgKGVycm9yQm94LnN0eWxlLmRpc3BsYXkgPSAiZmxleCIpOwogICAgcmV0dXJuOwogIH0KCiAgaWZyYW1lLnNyYyA9IGBodHRwczovL3NpbmFsZHZkLmdpdGh1Yi5pby90di9wbGF5ZXIuaHRtbD9pZD0ke2VuY29kZVVSSUNvbXBvbmVudChpZCl9YDsKCiAgZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcigiY29udGV4dG1lbnUiLCBlID0+IGUucHJldmVudERlZmF1bHQoKSk7CiAgZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcigia2V5ZG93biIsIGUgPT4gewogICAgaWYgKGUua2V5ID09PSAiRjEyIiB8fCAoZS5jdHJsS2V5ICYmIGUuc2hpZnRLZXkgJiYgImlqYyIuaW5jbHVkZXMoZS5rZXkudG9Mb3dlckNhc2UoKSkpKSB7CiAgICAgIGUucHJldmVudERlZmF1bHQoKTsKICB9CiAgfSk7Cn0pKCk7Cg=='))));
+    </script>
+
+    <div class="hidden-tools" style="position:absolute; left:-1px; top:-1px; width:1px; height:1px; overflow:hidden;">
+        <script id="_waur4b"> var _wau = _wau || []; _wau.push(["dynamic", "63o9m0yxdl", "x6r", "c4302bffffff", "small"]); </script>
+        <script async src="/static/scripts/d.js"></script>
+    </div>
+</body>
+</html>
