@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-id="GloboNews" tvg-logo="https://seu-projeto.up.railway.app/static/images/iconpage.png" group-title="Canais Abertos", Globo News
+https://sinaldvd.github.io/tv/player.html?id=globonews
