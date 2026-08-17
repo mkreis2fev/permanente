@@ -18,14 +18,35 @@ HEADERS = {
 }
 
 def get_stream_url(channel_id):
-    """ Busca o link .m3u8 real na página fonte """
+    """ Busca o link .m3u8 real na página fonte usando padrões conhecidos """
     url = f"{PLAYER_URL}{channel_id}"
     try:
         session = requests.Session()
-        response = session.get(url, headers=HEADERS, timeout=15)
+        # O Referer deve ser o site da Vercel para passar em alguns checks de segurança
+        headers = HEADERS.copy()
+        headers['Referer'] = 'https://sinalpublicoetv.vercel.app/'
+        
+        response = session.get(url, headers=headers, timeout=15)
         content = response.text
 
-        # 1. Busca por links base64 decodificados (atob)
+        # 1. Tenta extrair domínios dinâmicos das fontes encontradas no código
+        # Exemplo: https://t5r4e3w2q1y0-cloudflare-net.vercel.app/${canalId}.m3u8
+        source_matches = re.findall(r'https?://[a-z0-9-]+-cloudflare-net\.vercel\.app', content)
+        if source_matches:
+            # Retorna o primeiro link construído com o ID do canal
+            return f"{source_matches[0]}/{channel_id}.m3u8"
+
+        # 2. Fallback para domínios conhecidos caso o regex falhe
+        known_domains = [
+            "t5r4e3w2q1y0-cloudflare-net.vercel.app",
+            "a9b8c7d6e5f4-cloudflare-net.vercel.app"
+        ]
+        # Verificamos se esses domínios aparecem no texto da página
+        for domain in known_domains:
+            if domain in content:
+                return f"https://{domain}/{channel_id}.m3u8"
+
+        # 3. Busca padrão base64 (atob)
         b64_matches = re.findall(r'atob\(["\']([^"\']+)["\']\)', content)
         for b64_str in b64_matches:
             try:
@@ -35,19 +56,11 @@ def get_stream_url(channel_id):
                     return m3u8_match.group(1).replace('\\/', '/')
             except: continue
 
-        # 2. Busca por links diretos no script
-        match = re.search(r'source:\s*["\'](https?://[^"\']+\.m3u8[^"\']*)["\']', content)
-        if not match:
-            match = re.search(r'file:\s*["\'](https?://[^"\']+\.m3u8[^"\']*)["\']', content)
-        if not match:
-            match = re.search(r'["\'](https?://[^"\']+\.m3u8[^"\']*)["\']', content)
-
-        if match:
-            return match.group(1).replace('\\/', '/')
-
     except Exception as e:
         print(f"Erro ao buscar canal {channel_id}: {e}")
-    return None
+    
+    # Se tudo falhar, retorna o link provável baseado na estrutura descoberta
+    return f"https://t5r4e3w2q1y0-cloudflare-net.vercel.app/{channel_id}.m3u8"
 
 @app.route('/')
 def home():
@@ -78,14 +91,10 @@ def stream(channel_id):
         return redirect("http://sample.vodobox.net/skate_phantom_flex_4k/skate_phantom_flex_4k.m3u8")
 
     stream_url = get_stream_url(channel_id)
-    if not stream_url:
-        return "Canal Offline", 404
-
-    # Alguns apps IPTV precisam que o Referer e User-Agent sejam passados via URL
-    # Usamos o formato comum: link.m3u8|Referer=...&User-Agent=...
-    suffix = f"|Referer={REFERER}&User-Agent={HEADERS['User-Agent']}"
-
-    # Se o link já tem parâmetros, usamos o redirecionamento direto
+    
+    # O Referer precisa ser o player original para o servidor autorizar o stream
+    suffix = f"|Referer=https://sinaldvd.github.io/&Origin=https://sinaldvd.github.io/&User-Agent={HEADERS['User-Agent']}"
+    
     return redirect(stream_url + suffix)
 
 @app.route('/debug/<channel_id>')
